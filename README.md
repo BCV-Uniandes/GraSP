@@ -7,7 +7,7 @@ This repository provides instructions to download the GraSP dataset and run the 
 ## GraSP
 
 <div align="center">
-  <img src="images/dataset.jpg" width="70%" height="70%"/>
+  <img src="Images/dataset.jpg" width="70%" height="70%"/>
 </div><br/>
 
 In this [link](http://157.253.243.19/PSI-AVA/GraSP) you will find the original Radical Prostatectomy surgical videos and annotations that compose the Holistic and Multi-Granular Surgical Scene Understanding of Prostatectomies (GraSP) dataset. The data in the link has the following organization

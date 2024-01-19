@@ -1,7 +1,7 @@
 ## TAPIR
 
 <div align="center">
-  <img src="../images/TAPIS.jpg" width="70%" height="70%"/>
+  <img src="../Images/TAPIS.jpg" width="70%" height="70%"/>
 </div><br/>
 
 ### Installation
@@ -24,3 +24,14 @@ $ git clone https://github.com/BCV-Uniandes/GraSP
 $ cd GraSP/TAPIS
 $ pip install -r requirements.txt
 ```
+
+### Running the code
+
+For training TAPIS in:
+
+```sh
+# the Instrument detection or Atomic Action recognition task
+$ bash run_files/mvit_short_term.sh
+
+# the Phases or Steps recognition task
+$ bash run_files/mvit_long_term.sh
