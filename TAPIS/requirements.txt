@@ -1,0 +1,8 @@
+simplejson
+psutil
+tensorboard
+moviepy
+pytorchvideo
+pandas
+Pillow
+scikit-learn
