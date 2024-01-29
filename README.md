@@ -69,14 +69,14 @@ GraSP:
 |              |    |    ...
 |              |    ...
 |              |    
-|              |--grasp_dense_long-term_fold1.json
-|              |--grasp_dense_long-term_fold2.json
-|              |--grasp_dense_long-term_train.json
-|              |--grasp_dense_long-term_test.json
-|              |--grasp_dense_short-term_fold1.json
-|              |--grasp_dense_short-term_fold2.json
-|              |--grasp_dense_short-term_train.json
-|              |--grasp_dense_short-term_test.json
+|              |--grasp_long-term_fold1.json
+|              |--grasp_long-term_fold2.json
+|              |--grasp_long-term_train.json
+|              |--grasp_long-term_test.json
+|              |--grasp_short-term_fold1.json
+|              |--grasp_short-term_fold2.json
+|              |--grasp_short-term_train.json
+|              |--grasp_short-term_test.json
 |
 |--GraSP_30fps
 |         |---frames
@@ -90,10 +90,10 @@ GraSP:
 |         |    ...
 |         |
 |         |---annotations
-|              |--grasp_dense_short-term_fold1.json
-|              |--grasp_dense_short-term_fold2.json
-|              |--grasp_dense_short-term_train.json
-|              |--grasp_dense_short-term_test.json
+|              |--grasp_short-term_fold1.json
+|              |--grasp_short-term_fold2.json
+|              |--grasp_short-term_train.json
+|              |--grasp_short-term_test.json
 |
 |--1fps_to_30fps_association.json
 |--README.txt
@@ -118,7 +118,7 @@ $ wget -r http://157.253.243.19/PSI-AVA/GraSP/GraSP_30fps
 
 ## [TAPIS](./TAPIS/)
 
-Go to the [TAPIS directory](./TAPIS/) to find our source codes and instructions to run the code.
+Go to the [TAPIS directory](./TAPIS/) to find our **source codes and instructions** to run our **TAPIS model**.
 
 ## Citing GraSP
 
