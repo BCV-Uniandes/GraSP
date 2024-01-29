@@ -1,23 +1,24 @@
 # Pixel-wise Recognition for Holistic Surgical Scene Understanding
 
-We present the Holistic and Multi-Granular Surgical Scene Understanding of Prostatectomies (GraSP) dataset, a curated benchmark that models surgical scene understanding as a hierarchy of complementary tasks with varying levels of granularity. Our approach enables a multi-level comprehension of surgical activities, encompassing long-term tasks such as surgical phases and steps recognition and short-term tasks including surgical instrument segmentation and atomic visual actions detection. To exploit our proposed benchmark, we introduce the Transformers for Actions, Phases, Steps, and Instrument Segmentation (TAPIS) model, a general architecture that combines a global video feature extractor with localized region proposals from an instrument segmentation model to tackle the multi-granularity of our benchmark. Through extensive experimentation, we demonstrate the impact of including segmentation annotations in short-term recognition tasks, highlight the varying granularity requirements of each task, and establish TAPIS's superiority over previously proposed baselines and conventional CNN-based models. Additionally, we validate the robustness of our method across multiple public benchmarks, confirming the reliability and applicability of our dataset. This work represents a significant step forward in Endoscopic Vision, offering a novel and comprehensive framework for future research towards a holistic understanding of surgical procedures.
-
-This repository provides instructions to download the GraSP dataset and run the PyTorch implementation of TAPIS, both presented in the paper Pixel-Wise Recognition for Holistic Surgical Scene Understanding.
-
-## Paper
-
-[**Pixel-wise Recognition for Holistic Surgical Scene Understanding**](https://arxiv.org/abs/2401.11174) <br/>
-<br/>
 [Nicolás Ayobi](https://nayobi.github.io/)<sup>1</sup>, Santiago Rodríguez<sup>1*</sup>, Alejandra Pérez<sup>1*</sup>, Isabela Hernández<sup>1*</sup>, Nicolás Aparicio<sup>1</sup>, Eugénie Dessevres<sup>1</sup>, Sebastián Peña<sup>2</sup>, Jessica Santander<sup>2</sup>, Juan Ignacio Caicedo<sup>2</sup>, Nicolás Fernández<sup>3,4</sup>, [Pablo Arbeláez](https://scholar.google.com.co/citations?user=k0nZO90AAAAJ&hl=en)<sup>1</sup> <br/>
-<sup>*</sup>Equal contribution.<br/>
+<br/>
+<font size="9"> <sup>*</sup>Equal contribution.<br/>
 <sup>1 </sup> Center  for  Research  and  Formation  in  Artificial  Intelligence .([CINFONIA](https://cinfonia.uniandes.edu.co/)),  Universidad  de  los  Andes,  Bogotá 111711, Colombia. <br/>
 <sup>2 </sup> Fundación Santafé de Bogotá, Bogotá, Colombia<br/>
 <sup>3 </sup> Seattle Children’s Hospital, Seattle, USA <br/>
-<sup>4 </sup> University of Washington, Seattle, USA <br/>
+<sup>4 </sup> University of Washington, Seattle, USA <br/> </font>
 
-**Preprint available at [ArXiv](https://arxiv.org/abs/2401.11174) "Pixel-wise Recognition for Holistic Surgical Scene Understanding" with code 2401.11174**<br/>
+Preprint available at [**arXiv**](https://arxiv.org/abs/2401.11174)<br/>
+Visit the project in our [**website**](https://cinfonia.uniandes.edu.co/publications/pixel-wise-recognition-for-holistic-surgical-scene-understanding/).
 
-Visit the project in our [website](https://cinfonia.uniandes.edu.co/publications/pixel-wise-recognition-for-holistic-surgical-scene-understanding/).
+
+<div align="center">
+  <img src="Images/dataset.jpg"/>
+</div><br/>
+
+We present the Holistic and Multi-Granular Surgical Scene Understanding of Prostatectomies (GraSP) dataset, a curated benchmark that models surgical scene understanding as a hierarchy of complementary tasks with varying levels of granularity. Our approach enables a multi-level comprehension of surgical activities, encompassing long-term tasks such as surgical phases and steps recognition and short-term tasks including surgical instrument segmentation and atomic visual actions detection. To exploit our proposed benchmark, we introduce the Transformers for Actions, Phases, Steps, and Instrument Segmentation (TAPIS) model, a general architecture that combines a global video feature extractor with localized region proposals from an instrument segmentation model to tackle the multi-granularity of our benchmark. Through extensive experimentation, we demonstrate the impact of including segmentation annotations in short-term recognition tasks, highlight the varying granularity requirements of each task, and establish TAPIS's superiority over previously proposed baselines and conventional CNN-based models. Additionally, we validate the robustness of our method across multiple public benchmarks, confirming the reliability and applicability of our dataset. This work represents a significant step forward in Endoscopic Vision, offering a novel and comprehensive framework for future research towards a holistic understanding of surgical procedures.
+
+This repository provides instructions to download the [**GraSP** dataset](https://github.com/BCV-Uniandes/GraSP?tab=readme-ov-file#grasp) and run the PyTorch implementation of [**TAPIS**](https://github.com/BCV-Uniandes/GraSP/tree/main/TAPIS), both presented in the paper *Pixel-Wise Recognition for Holistic Surgical Scene Understanding*.
 
 ## Previous works
 
@@ -30,10 +31,6 @@ This work is an extended and consolidated version of three previous works:
 Please check these works.
 
 ## GraSP
-
-<div align="center">
-  <img src="Images/dataset.jpg" width="70%" height="70%"/>
-</div><br/>
 
 In this [link](http://157.253.243.19/PSI-AVA/GraSP), you will find the sampled frames of the original Radical Prostatectomy videos and the annotations that compose the Holistic and Multi-Granular Surgical Scene Understanding of Prostatectomies (GraSP) dataset. The data in the link has the following organization:
 
