@@ -22,11 +22,9 @@ Visit the project in our [website](https://cinfonia.uniandes.edu.co/publications
 
 This work is an extended and consolidated version of three previous works:
 
-<ul>
-  <li> [Towards Holistic Surgical Scene Understanding](https://link.springer.com/chapter/10.1007/978-3-031-16449-1_42), **MICCAI 2022, Oral.** Code [here](https://github.com/BCV-Uniandes/TAPIR).</li>
-  <li> **Winner solution** of the [2022 SAR-RARP50 challenge](https://arxiv.org/abs/2401.00496)</li>
-  <li> [MATIS: Masked-Attention Transformers for Surgical Instrument Segmentation](https://ieeexplore.ieee.org/document/10230819), **ISBI 2023, Oral.** Code [here](https://github.com/BCV-Uniandes/MATIS). </li> 
-</ul>
+- [Towards Holistic Surgical Scene Understanding](https://link.springer.com/chapter/10.1007/978-3-031-16449-1_42), **MICCAI 2022, Oral.** Code [here](https://github.com/BCV-Uniandes/TAPIR).
+- **Winner solution** of the [2022 SAR-RARP50 challenge](https://arxiv.org/abs/2401.00496)
+- [MATIS: Masked-Attention Transformers for Surgical Instrument Segmentation](https://ieeexplore.ieee.org/document/10230819), **ISBI 2023, Oral.** Code [here](https://github.com/BCV-Uniandes/MATIS).
 
 Please check these works.
 
@@ -36,7 +34,7 @@ Please check these works.
   <img src="Images/dataset.jpg" width="70%" height="70%"/>
 </div><br/>
 
-In this [link](http://157.253.243.19/PSI-AVA/GraSP) you will find the sampled frames of the original Radical Prostatectomy videos and the annotations that compose the Holistic and Multi-Granular Surgical Scene Understanding of Prostatectomies (GraSP) dataset. The data in the link has the following organization:
+In this [link](http://157.253.243.19/PSI-AVA/GraSP), you will find the sampled frames of the original Radical Prostatectomy videos and the annotations that compose the Holistic and Multi-Granular Surgical Scene Understanding of Prostatectomies (GraSP) dataset. The data in the link has the following organization:
 
 ```tree
 GraSP:
@@ -103,13 +101,13 @@ GraSP:
 |--README.txt
 ```
 
-In the [GraSP_1fps directory](http://157.253.243.19/PSI-AVA/GraSP/GraSP_1fps) you will find our video frames sampled at 1fps and all the annotations for long-term tasks (surgical phases and steps recognition) and short-term tasks (instrument segmentation and atomic action detection). Additionally, in the [GraSP_30fps directory](http://157.253.243.19/PSI-AVA/GraSP/GraSP_30fps) you will find all the frames of our videos sampled at 30fps and their corresponding annotations for short-term tasks. We provide a README file in the link with a brief explanation ofour annotations. We recommend to download the data recursively with:
+In the [GraSP_1fps directory](http://157.253.243.19/PSI-AVA/GraSP/GraSP_1fps), you will find our video frames sampled at 1fps and all the annotations for long-term tasks (surgical phases and steps recognition) and short-term tasks (instrument segmentation and atomic action detection). Additionally, in the [GraSP_30fps directory](http://157.253.243.19/PSI-AVA/GraSP/GraSP_30fps), you will find all the frames of our videos sampled at 30fps and their corresponding annotations for short-term tasks. We provide a README file in the link, briefly explaining our annotations. We recommend downloading the data recursively with the following command:
 
 ```sh
 $ wget -r http://157.253.243.19/PSI-AVA/GraSP
 ```
 
-If you only need the dataset with the video frames sampled at 1fps or at 30fps you can just download the directory of the version that you need:
+If you only need the dataset with the video frames sampled at 1fps or 30fps, you can download the directory of the version that you need:
 
 
 ```sh
@@ -122,11 +120,11 @@ $ wget -r http://157.253.243.19/PSI-AVA/GraSP/GraSP_30fps
 
 ## [TAPIS](./TAPIS/)
 
-Go to the [TAPIS directory](./TAPIS/) to find our source codes and intructions to run the code.
+Go to the [TAPIS directory](./TAPIS/) to find our source codes and instructions to run the code.
 
 ## Citing GraSP
 
-If you find GraSP or TAPIS usefull for your research, please include the following BibTex citations in your papers.
+If you find GraSP or TAPIS useful for your research, please include the following BibTex citations in your papers.
 
 ```BibTeX
 @misc{ayobi2024pixelwise,
