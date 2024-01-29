@@ -1,4 +1,4 @@
-## TAPIR
+## TAPIS
 
 <div align="center">
   <img src="../Images/TAPIS.jpg" width="70%" height="70%"/>
