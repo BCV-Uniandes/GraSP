@@ -6,8 +6,9 @@ This repository provides instructions to download the GraSP dataset and run the 
 
 ## Paper
 
-[Pixel-wise Recognition for Holistic Surgical Scene Understanding](https://arxiv.org/abs/2401.11174) <br/>
-[Nicolás Ayobi](https://nayobi.github.io/)<sup>1</sup>, Santiago Rodríguez<sup>1*</sup>, Alejandra Pérez<sup>1*</sup>, Isabela Hernández<sup>1*</sup>, Nicolás Aparicio<sup>1</sup>, Eugégia Dessevres<sup>1</sup>, Sebastián Peña<sup>2</sup>, Jessica Santander<sup>2</sup>, Juan Ignacio Caicedo<sup>2</sup>, Nicolás Fernández<sup>3,4</sup>, [Pablo Arbeláez](https://scholar.google.com.co/citations?user=k0nZO90AAAAJ&hl=en)<sup>1</sup> <br/>
+[**Pixel-wise Recognition for Holistic Surgical Scene Understanding**](https://arxiv.org/abs/2401.11174) <br/>
+<br/>
+[Nicolás Ayobi](https://nayobi.github.io/)<sup>1</sup>, Santiago Rodríguez<sup>1*</sup>, Alejandra Pérez<sup>1*</sup>, Isabela Hernández<sup>1*</sup>, Nicolás Aparicio<sup>1</sup>, Eugénie Dessevres<sup>1</sup>, Sebastián Peña<sup>2</sup>, Jessica Santander<sup>2</sup>, Juan Ignacio Caicedo<sup>2</sup>, Nicolás Fernández<sup>3,4</sup>, [Pablo Arbeláez](https://scholar.google.com.co/citations?user=k0nZO90AAAAJ&hl=en)<sup>1</sup> <br/>
 <sup>*</sup>Equal contribution.<br/>
 <sup>1 </sup> Center  for  Research  and  Formation  in  Artificial  Intelligence .([CINFONIA](https://cinfonia.uniandes.edu.co/)),  Universidad  de  los  Andes,  Bogotá 111711, Colombia. <br/>
 <sup>2 </sup> Fundación Santafé de Bogotá, Bogotá, Colombia<br/>
@@ -18,7 +19,7 @@ This repository provides instructions to download the GraSP dataset and run the 
 
 Visit the project in our [website](https://cinfonia.uniandes.edu.co/publications/pixel-wise-recognition-for-holistic-surgical-scene-understanding/).
 
-### Previous works
+## Previous works
 
 This work is an extended and consolidated version of three previous works:
 
