@@ -134,7 +134,7 @@ If you find GraSP or TAPIS useful for your research, please include the followin
       primaryClass={cs.CV}
 }
 
-@@InProceedings{valderrama2020tapir,
+@InProceedings{valderrama2020tapir,
       author={Natalia Valderrama and Paola Ruiz and Isabela Hern{\'a}ndez and Nicol{\'a}s Ayobi and Mathilde Verlyck and Jessica Santander and Juan Caicedo and Nicol{\'a}s Fern{\'a}ndez and Pablo Arbel{\'a}ez},
       title={Towards Holistic Surgical Scene Understanding},
       booktitle={Medical Image Computing and Computer Assisted Intervention -- MICCAI 2022},

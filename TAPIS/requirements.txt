@@ -6,3 +6,4 @@ pytorchvideo
 pandas
 Pillow
 scikit-learn
+scikit-image
