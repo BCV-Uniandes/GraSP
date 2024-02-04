@@ -10,16 +10,18 @@ import os
 import pprint
 import torch
 
-import tapir.models.losses as losses
-import tapir.models.optimizer as optim
-import tapir.utils.checkpoint as cu
-import tapir.utils.distributed as du
-import tapir.utils.logging as logging
-import tapir.utils.misc as misc
+import tapis.models.losses as losses
+import tapis.models.optimizer as optim
+import tapis.utils.checkpoint as cu
+import tapis.utils.distributed as du
+import tapis.utils.logging as logging
+import tapis.utils.misc as misc
 
-from tapir.datasets import loader
-from tapir.models import build_model
-from tapir.utils.meters import EpochTimer, SurgeryMeter
+from tapis.datasets import loader
+from tapis.models import build_model
+from tapis.utils.meters import EpochTimer, SurgeryMeter
+import torch.backends.cudnn as cudnn
+import torch.backends.cudnn
 
 logger = logging.get_logger(__name__)
 
@@ -53,7 +55,7 @@ def train_epoch(
     loss_funs = cfg.TASKS.LOSS_FUNC
 
     loss_dict = {task:losses.get_loss_func(loss_funs[t_id])(reduction=cfg.SOLVER.REDUCTION) for t_id,task in enumerate(tasks)}
-    type_dict = {task:losses.get_loss_type(loss_funs[t_id]) for t_id,task in enumerate(tasks)}
+    type_dict = {task:losses.get_loss_type(loss_funs[t_id],cfg.MODEL.PRECISION) for t_id,task in enumerate(tasks)}
     loss_weights = cfg.TASKS.LOSS_WEIGHTS
     if cfg.REGIONS.ENABLE and cfg.TASKS.PRESENCE_RECOGNITION:
         pres_loss_dict = {f'{task}_presence':losses.get_loss_func('bce')(reduction=cfg.SOLVER.REDUCTION) for task in cfg.TASKS.PRESENCE_TASKS}
@@ -67,12 +69,18 @@ def train_epoch(
         # Transfer the data to the current GPU device.
         if cfg.NUM_GPUS:
             inputs[0] = inputs[0].cuda(non_blocking=True)
+            if cfg.MODEL.PRECISION == 64:
+                inputs[0] = inputs[0].double()
 
             for key, val in data.items():
                 data[key] = val.cuda(non_blocking=True)
+                if cfg.MODEL.PRECISION == 64:
+                    data[key]  = data[key].double()
 
             for key, val in labels.items():
                 labels[key] = val.cuda(non_blocking=True)
+                if cfg.MODEL.PRECISION == 64:
+                    labels[key]  = labels[key].double()
             
             if cfg.NUM_GPUS>1:
                 image_names = image_names.cuda(non_blocking=True)
@@ -162,14 +170,19 @@ def eval_epoch(val_loader, model, val_meter, cur_epoch, cfg):
 
     for cur_iter, (inputs, labels, data, image_names) in enumerate(val_loader):
         if cfg.NUM_GPUS:
-            # Transferthe data to the current GPU device.
             inputs[0] = inputs[0].cuda(non_blocking=True)
+            if cfg.MODEL.PRECISION == 64:
+                inputs[0] = inputs[0].double()
 
             for key, val in data.items():
                 data[key] = val.cuda(non_blocking=True)
-            
+                if cfg.MODEL.PRECISION == 64:
+                    data[key]  = data[key].double()
+
             for key, val in labels.items():
                 labels[key] = val.cuda(non_blocking=True)
+                if cfg.MODEL.PRECISION == 64:
+                    labels[key]  = labels[key].double()
             
             if cfg.NUM_GPUS>1:
                 image_names = image_names.cuda(non_blocking=True)
@@ -198,7 +211,7 @@ def eval_epoch(val_loader, model, val_meter, cur_epoch, cfg):
 
                 for task in preds:
                     if task not in region_tasks:
-                        preds[task] = torch.cat(du.all_gather_unaligned(preds[task]), dim=0).tolist()
+                        preds[task] = torch.cat(du.all_gather_unaligned(preds[task]), dim=0)
                     else:
                         preds[task] = torch.cat(du.all_gather_unaligned(preds[task]), dim=0)
 
@@ -217,6 +230,9 @@ def eval_epoch(val_loader, model, val_meter, cur_epoch, cfg):
             ori_boxes = [ori_boxes[boxes_idxs==idx].tolist() for idx in range(len(boxes_mask))]
             for task in region_tasks:
                 preds[task] = [preds[task][boxes_idxs==idx].tolist() for idx in range(len(boxes_mask))]
+        for task in complete_tasks:
+            if task not in region_tasks:
+                preds[task] = preds[task].tolist()
         
         # Update and log stats.
         val_meter.update_stats(preds, image_names, ori_boxes)
@@ -249,6 +265,8 @@ def train(cfg):
     random.seed(cfg.RNG_SEED)
     np.random.seed(cfg.RNG_SEED)
     torch.manual_seed(cfg.RNG_SEED)
+    cudnn.benchmark = False
+    cudnn.deterministic = True
 
     # Setup logging format.
     logging.setup_logging(cfg.OUTPUT_DIR)
@@ -259,11 +277,19 @@ def train(cfg):
 
     # Build the video model and print model statistics.
     model = build_model(cfg)
+    if cfg.MODEL.PRECISION == 64:
+        model = model.double()
 
     # Calculating model info (param & flops). 
     # Remove if it is not working
-    # if du.is_master_proc() and cfg.LOG_MODEL_INFO:
-    #     misc.log_model_info(model, cfg, use_train_input=True)
+    try:
+        if du.is_master_proc() and cfg.LOG_MODEL_INFO:
+            misc.log_model_info(model, cfg, use_train_input=True)
+            for task in cfg.TASKS.TASKS:
+                head = getattr(model, "extra_heads_{}".format(task))
+                misc.log_model_info(head, cfg, use_train_input=False)
+    except:
+        pass
 
     # Construct the optimizer.
     optimizer = optim.construct_optimizer(model, cfg)
@@ -406,4 +432,3 @@ def train(cfg):
             cfg,
             scaler if cfg.TRAIN.MIXED_PRECISION else None,
             )
-

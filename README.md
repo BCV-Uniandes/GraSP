@@ -2,11 +2,11 @@
 
 [Nicolás Ayobi](https://nayobi.github.io/)<sup>1</sup>, Santiago Rodríguez<sup>1*</sup>, Alejandra Pérez<sup>1*</sup>, Isabela Hernández<sup>1*</sup>, Nicolás Aparicio<sup>1</sup>, Eugénie Dessevres<sup>1</sup>, Sebastián Peña<sup>2</sup>, Jessica Santander<sup>2</sup>, Juan Ignacio Caicedo<sup>2</sup>, Nicolás Fernández<sup>3,4</sup>, [Pablo Arbeláez](https://scholar.google.com.co/citations?user=k0nZO90AAAAJ&hl=en)<sup>1</sup> <br/>
 <br/>
-<font size="1"> <sup>*</sup>Equal contribution.<br/>
-<sup>1 </sup> Center  for  Research  and  Formation  in  Artificial  Intelligence .([CinfonIA](https://cinfonia.uniandes.edu.co/)),  Universidad  de  los  Andes,  Bogotá 111711, Colombia. <br/>
-<sup>2 </sup> Fundación Santafé de Bogotá, Bogotá, Colombia<br/>
-<sup>3 </sup> Seattle Children’s Hospital, Seattle, USA <br/>
-<sup>4 </sup> University of Washington, Seattle, USA <br/> </font>
+<font size="1"><sup>*</sup>Equal contribution.</font><br/>
+<font size="1"><sup>1 </sup> Center  for  Research  and  Formation  in  Artificial  Intelligence .([CinfonIA](https://cinfonia.uniandes.edu.co/)),  Universidad  de  los  Andes,  Bogotá 111711, Colombia.</font><br/>
+<font size="1"><sup>2 </sup> Fundación Santafé de Bogotá, Bogotá, Colombia</font><br/>
+<font size="1"><sup>3 </sup> Seattle Children’s Hospital, Seattle, USA</font><br/>
+<font size="1"><sup>4 </sup> University of Washington, Seattle, USA</font><br/>
 
 Preprint available at [**arXiv**](https://arxiv.org/abs/2401.11174)<br/>
 Visit the project in our [**website**](https://cinfonia.uniandes.edu.co/publications/pixel-wise-recognition-for-holistic-surgical-scene-understanding/).

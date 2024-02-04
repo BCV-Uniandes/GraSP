@@ -1,0 +1,23 @@
+_BASE_: endovis_2018_R50.yaml
+MODEL:
+  BACKBONE:
+    NAME: "D2SwinTransformer"
+  SWIN:
+    EMBED_DIM: 96
+    DEPTHS: [2, 2, 18, 2]
+    NUM_HEADS: [3, 6, 12, 24]
+    WINDOW_SIZE: 7
+    APE: False
+    DROP_PATH_RATE: 0.3
+    PATCH_NORM: True
+  WEIGHTS: "models/coco/instance-segmentation/model_final_swinS.pkl"
+  PIXEL_MEAN: [123.675, 116.280, 103.530]
+  PIXEL_STD: [58.395, 57.120, 57.375]
+SOLVER:
+  IMS_PER_BATCH: 24
+  STEPS: (3035, 3288, 6070, 6576)
+  MAX_ITER: 6829
+TEST:
+  EVAL_PERIOD: 1500
+
+

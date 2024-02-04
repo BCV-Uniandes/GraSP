@@ -1,0 +1,4 @@
+# ninja log v5
+0	3634	1707068951167265878	/media/SSD0/nayobi/Endovis/GraSP/TAPIS/region_proposals/mask2former/modeling/pixel_decoder/ops/build/temp.linux-x86_64-cpython-38/media/SSD0/nayobi/Endovis/GraSP/TAPIS/region_proposals/mask2former/modeling/pixel_decoder/ops/src/cpu/ms_deform_attn_cpu.o	be86608ae7439f38
+0	11123	1707068958643416267	/media/SSD0/nayobi/Endovis/GraSP/TAPIS/region_proposals/mask2former/modeling/pixel_decoder/ops/build/temp.linux-x86_64-cpython-38/media/SSD0/nayobi/Endovis/GraSP/TAPIS/region_proposals/mask2former/modeling/pixel_decoder/ops/src/cuda/ms_deform_attn_cuda.o	ce804714e496113d
+1	17745	1707068965259549343	/media/SSD0/nayobi/Endovis/GraSP/TAPIS/region_proposals/mask2former/modeling/pixel_decoder/ops/build/temp.linux-x86_64-cpython-38/media/SSD0/nayobi/Endovis/GraSP/TAPIS/region_proposals/mask2former/modeling/pixel_decoder/ops/src/vision.o	50639b3692d1a0e4

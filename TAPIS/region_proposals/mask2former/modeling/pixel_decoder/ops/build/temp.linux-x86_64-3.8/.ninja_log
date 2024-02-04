@@ -1,0 +1,4 @@
+# ninja log v5
+0	2955	1641493738771499832	/media/SSD0/nayobi/Endovis/Mask2Former/mask2former/modeling/pixel_decoder/ops/build/temp.linux-x86_64-3.8/media/SSD0/nayobi/Endovis/Mask2Former/mask2former/modeling/pixel_decoder/ops/src/cpu/ms_deform_attn_cpu.o	b5f38b301d7fde23
+1	10833	1641493746643566104	/media/SSD0/nayobi/Endovis/Mask2Former/mask2former/modeling/pixel_decoder/ops/build/temp.linux-x86_64-3.8/media/SSD0/nayobi/Endovis/Mask2Former/mask2former/modeling/pixel_decoder/ops/src/cuda/ms_deform_attn_cuda.o	306d014df2464899
+0	17226	1641493753035619922	/media/SSD0/nayobi/Endovis/Mask2Former/mask2former/modeling/pixel_decoder/ops/build/temp.linux-x86_64-3.8/media/SSD0/nayobi/Endovis/Mask2Former/mask2former/modeling/pixel_decoder/ops/src/vision.o	64743e3915710e73
