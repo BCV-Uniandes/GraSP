@@ -32,7 +32,7 @@ Please check these works.
 
 ## GraSP
 
-In this [link](http://157.253.243.19/PSI-AVA/GraSP), you will find the sampled frames of the original Radical Prostatectomy videos and the annotations that compose the Holistic and Multi-Granular Surgical Scene Understanding of Prostatectomies (GraSP) dataset. The data in the link has the following organization:
+In this [link](http://157.253.243.19/GraSP), you will find the sampled frames of the original Radical Prostatectomy videos and the annotations that compose the Holistic and Multi-Granular Surgical Scene Understanding of Prostatectomies (GraSP) dataset. The data in the link has the following organization:
 
 ```tree
 GraSP:
@@ -99,10 +99,10 @@ GraSP:
 |--README.txt
 ```
 
-In the [GraSP_1fps directory](http://157.253.243.19/PSI-AVA/GraSP/GraSP_1fps), you will find our video frames sampled at 1fps and all the annotations for long-term tasks (surgical phases and steps recognition) and short-term tasks (instrument segmentation and atomic action detection). Additionally, in the [GraSP_30fps directory](http://157.253.243.19/PSI-AVA/GraSP/GraSP_30fps), you will find all the frames of our videos sampled at 30fps and their corresponding annotations for short-term tasks. We provide a README file in the link, briefly explaining our annotations. We recommend downloading the data recursively with the following command:
+In the [GraSP_1fps directory](http://157.253.243.19/GraSP/GraSP_1fps), you will find our video frames sampled at 1fps and all the annotations for long-term tasks (surgical phases and steps recognition) and short-term tasks (instrument segmentation and atomic action detection). Additionally, in the [GraSP_30fps directory](http://157.253.243.19/GraSP/GraSP_30fps), you will find all the frames of our videos sampled at 30fps and their corresponding annotations for short-term tasks. We provide a README file in the link, briefly explaining our annotations. We recommend downloading the data recursively with the following command:
 
 ```sh
-$ wget -r http://157.253.243.19/PSI-AVA/GraSP
+$ wget -r http://157.253.243.19/GraSP
 ```
 
 If you only need the dataset with the video frames sampled at 1fps or 30fps, you can download the directory of the version that you need:
@@ -110,10 +110,10 @@ If you only need the dataset with the video frames sampled at 1fps or 30fps, you
 
 ```sh
 # 1fps version
-$ wget -r http://157.253.243.19/PSI-AVA/GraSP/GraSP_1fps
+$ wget -r http://157.253.243.19/GraSP/GraSP_1fps
 
 # 30fps version
-$ wget -r http://157.253.243.19/PSI-AVA/GraSP/GraSP_30fps
+$ wget -r http://157.253.243.19/GraSP/GraSP_30fps
 ```
 
 ## [TAPIS](./TAPIS/)
@@ -125,12 +125,13 @@ Go to the [TAPIS directory](./TAPIS/) to find our **source codes and instruction
 If you find GraSP or TAPIS useful for your research, please include the following BibTex citations in your papers.
 
 ```BibTeX
-@misc{ayobi2024pixelwise,
+@article{ayobi2024pixelwise,
       title={Pixel-Wise Recognition for Holistic Surgical Scene Understanding}, 
-      author={Nicol{\'a}s Ayobi and Santiago Rodr{\'i}guez and Alejandra P{\'e}rez and Isabela Hern{\'a}ndez and Nicol{\'a}s Aparicio and Eug{\'e}nie Dessevres and Sebasti{\'a}n Peña and Jessica Santander and Juan Ignacio Caicedo and Nicol{\'a}s Fern{\'a}ndez and Pablo Arbel{\'a}ez},
+      author={Nicolás Ayobi and Santiago Rodríguez and Alejandra Pérez and Isabela Hernández and Nicolás Aparicio and Eugénie Dessevres and Sebastián Peña and Jessica Santander and Juan Ignacio Caicedo and Nicolás Fernández and Pablo Arbeláez},
       year={2024},
+      url={https://arxiv.org/abs/2401.11174},
       eprint={2401.11174},
-      archivePrefix={arXiv},
+      journal={arXiv},
       primaryClass={cs.CV}
 }
 

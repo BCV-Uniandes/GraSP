@@ -37,7 +37,7 @@ $ pip install -r requirements.txt
 
 ## Data Preparation
 
-In this [link](http://157.253.243.19/PSI-AVA/TAPIS), you will find our preprocessed data files, region proposals, and pre-trained models. We provide a README file with instructions about the data structures and the files in the link. Download these files and locate them in a directory named GraSP in the data directory of this repository. Please also include the video frames. In the end, the repository must have the following structure.
+In this [link](http://157.253.243.19/TAPIS), you will find our preprocessed data files, region proposals, and pre-trained models. We provide a README file with instructions about the data structures and the files in the link. Download these files and locate them in a directory named GraSP in the data directory of this repository. Please also include the video frames. In the end, the repository must have the following structure.
 
 ```tree
 TAPIS
@@ -86,8 +86,8 @@ TAPIS
 |       |--pretrained_models
 |           |--ACTIONS
 |           |   |--actions_m2f-swinl_fold1.pyth
-|           |   |--actions_m2f-swinl_fold1.pyth
-|           |   |--actions_m2f-swinl_fold1.pyth
+|           |   |--actions_m2f-swinl_fold2.pyth
+|           |   |--actions_m2f-swinl_train.pyth
 |           |--INSTRUMENTS
 |           |   ...
 |           |--PHASES
@@ -108,10 +108,10 @@ Feel free to use soft/hard linking to other paths or to modify the directory str
 
 | Task | cross-val mAP | test mAP | config | run file | model |
 | ----- | ----- | ----- | ----- | ----- | ----- |
-| Phases | 72.87 $\pm$ 1.66 | 56.55 | [PHASES]() | [phases]() | [phases]() |
-| Steps | 49.165 $\pm$ 0.004 | 49.45 | [STEPS]() | [steps]() | [steps]() |
-| Instruments | 90.28 $\pm$ 0.83 | 89.09 | [INSTRUMENTS]() | [instruments]() | [instruments]() |
-| Actions | 34.27 $\pm$ 1.76 | 39.50 | [ACTIONS]() | [actions]() | [actions]() |
+| Phases | 72.87 $\pm$ 1.66 | 74.06 | [PHASES](https://github.com/BCV-Uniandes/GraSP/blob/main/TAPIS/configs/GraSP/TAPIS_PHASES.yaml) | [phases](https://github.com/BCV-Uniandes/GraSP/blob/main/TAPIS/run_files/grasp_phases.sh) | [phases](http://157.253.243.19/TAPIS/pretrained_models/PHASES/) |
+| Steps | 49.165 $\pm$ 0.004 | 49.45 | [STEPS](https://github.com/BCV-Uniandes/GraSP/blob/main/TAPIS/configs/GraSP/TAPIS_STEPS.yaml) | [steps](https://github.com/BCV-Uniandes/GraSP/blob/main/TAPIS/run_files/grasp_steps.sh) | [steps](http://157.253.243.19/TAPIS/pretrained_models/STEPS/) |
+| Instruments | 90.28 $\pm$ 0.83 | 89.09 | [INSTRUMENTS](https://github.com/BCV-Uniandes/GraSP/blob/main/TAPIS/configs/GraSP/TAPIS_INSTRUMENTS.yaml) | [instruments](https://github.com/BCV-Uniandes/GraSP/blob/main/TAPIS/run_files/grasp_instruments.sh) | [instruments](http://157.253.243.19/TAPIS/pretrained_models/INSTRUMENTS/) |
+| Actions | 34.27 $\pm$ 1.76 | 39.50 | [ACTIONS](https://github.com/BCV-Uniandes/GraSP/blob/main/TAPIS/configs/GraSP/TAPIS_ACTIONS.yaml) | [actions](https://github.com/BCV-Uniandes/GraSP/blob/main/TAPIS/run_files/grasp_actions.sh) | [actions](http://157.253.243.19/TAPIS/pretrained_models/ACTIONS/) |
 
 We provide bash scripts with the default parameters to evaluate each GraSP task. Please first download our preprocessed data files and pretrained models as instructed earlier and run the following commands to run evaluation on each task:
 
@@ -156,12 +156,13 @@ Coming soon!
 If you find GraSP or TAPIS useful for your research, please include the following BibTex citations in your papers.
 
 ```BibTeX
-@misc{ayobi2024pixelwise,
+@article{ayobi2024pixelwise,
       title={Pixel-Wise Recognition for Holistic Surgical Scene Understanding}, 
-      author={Nicol{\'a}s Ayobi and Santiago Rodr{\'i}guez and Alejandra P{\'e}rez and Isabela Hern{\'a}ndez and Nicol{\'a}s Aparicio and Eug{\'e}nie Dessevres and Sebasti{\'a}n Peña and Jessica Santander and Juan Ignacio Caicedo and Nicol{\'a}s Fern{\'a}ndez and Pablo Arbel{\'a}ez},
+      author={Nicolás Ayobi and Santiago Rodríguez and Alejandra Pérez and Isabela Hernández and Nicolás Aparicio and Eugénie Dessevres and Sebastián Peña and Jessica Santander and Juan Ignacio Caicedo and Nicolás Fernández and Pablo Arbeláez},
       year={2024},
+      url={https://arxiv.org/abs/2401.11174},
       eprint={2401.11174},
-      archivePrefix={arXiv},
+      journal={arXiv},
       primaryClass={cs.CV}
 }
 
