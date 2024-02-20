@@ -120,6 +120,10 @@ $ wget -r http://157.253.243.19/GraSP/GraSP_30fps
 
 Go to the [TAPIS directory](./TAPIS/) to find our **source codes and instructions** to run our **TAPIS model**.
 
+## Contact
+
+If you have any doubts, questions, issues, corrections, or comments, please email n.ayobi@uniandes.edu.co.
+
 ## Citing GraSP
 
 If you find GraSP or TAPIS useful for your research, please include the following BibTex citations in your papers.
