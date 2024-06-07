@@ -3,7 +3,7 @@
 [Nicolás Ayobi](https://nayobi.github.io/)<sup>1,2</sup>, Santiago Rodríguez<sup>1,2*</sup>, Alejandra Pérez<sup>1,2*</sup>, Isabela Hernández<sup>1,2*</sup>, Nicolás Aparicio<sup>1,2</sup>, Eugénie Dessevres<sup>1,2</sup>, Sebastián Peña<sup>3</sup>, Jessica Santander<sup>3</sup>, Juan Ignacio Caicedo<sup>3</sup>, Nicolás Fernández<sup>4,5</sup>, [Pablo Arbeláez](https://scholar.google.com.co/citations?user=k0nZO90AAAAJ&hl=en)<sup>1,2</sup> <br/>
 <br/>
 <font size="1"><sup>*</sup>Equal contribution.</font><br/>
-<font size="1"><sup>1 </sup> Center  for  Research  and  Formation  in  Artificial  Intelligence ([CinfonIA](https://cinfonia.uniandes.edu.co/)), Bogotá, Colombia
+<font size="1"><sup>1 </sup> Center  for  Research  and  Formation  in  Artificial  Intelligence ([CinfonIA](https://cinfonia.uniandes.edu.co/)), Bogotá, Colombia.</font><br/>
 <font size="1"><sup>2 </sup> Universidad  de  los  Andes,  Bogotá, Colombia.</font><br/>
 <font size="1"><sup>3 </sup> Fundación Santafé de Bogotá, Bogotá, Colombia</font><br/>
 <font size="1"><sup>4 </sup> Seattle Children’s Hospital, Seattle, USA</font><br/>
@@ -76,7 +76,7 @@ For example, you can only download the video files by running:
 $ wget http://157.253.243.19/GraSP/videos.tar.gz
 ```
 
-**Note:** All compressed archives contain a README file with further details and instructions on the data's structure and format. 
+**Note:** All compressed archives **contain a README file** with further details and instructions on the data's structure and format. 
 
 ### Main Dataset to Run our Models
 
@@ -142,17 +142,26 @@ If you have any doubts, questions, issues, corrections, or comments, please emai
 
 ## Citing GraSP
 
-If you find GraSP or TAPIS useful for your research, please include the following BibTex citations in your papers.
+If you find GraSP or TAPIS useful for your research (or its previous versions PSI-AVA, TAPIR and MATIS), please include the following BibTex citations in your papers.
 
 ```BibTeX
 @article{ayobi2024pixelwise,
       title={Pixel-Wise Recognition for Holistic Surgical Scene Understanding}, 
-      author={Nicolás Ayobi and Santiago Rodríguez and Alejandra Pérez and Isabela Hernández and Nicolás Aparicio and Eugénie Dessevres and Sebastián Peña and Jessica Santander and Juan Ignacio Caicedo and Nicolás Fernández and Pablo Arbeláez},
+      author={Nicol{\'a}s Ayobi and Santiago Rodr{\'i}guez and Alejandra P{\'e}rez and Isabela Hern{\'a}ndez and Nicol{\'a}s Aparicio and Eug{\'e}nie Dessevres and Sebasti{\'a}n Peña and Jessica Santander and Juan Ignacio Caicedo and Nicol{\'a}s Fernández and Pablo Arbel{\'a}ez},
       year={2024},
       url={https://arxiv.org/abs/2401.11174},
       eprint={2401.11174},
       journal={arXiv},
       primaryClass={cs.CV}
+}
+
+@InProceedings{ayobi2023matis,
+      author={Nicol{\'a}s Ayobi and Alejandra P{\'e}rez-Rond{\'o}n and Santiago Rodr{\'i}guez and Pablo Arbel{\'a}es},
+      booktitle={2023 IEEE 20th International Symposium on Biomedical Imaging (ISBI)}, 
+      title={MATIS: Masked-Attention Transformers for Surgical Instrument Segmentation}, 
+      year={2023},
+      pages={1-5},
+      doi={10.1109/ISBI53787.2023.10230819}
 }
 
 @InProceedings{valderrama2020tapir,
