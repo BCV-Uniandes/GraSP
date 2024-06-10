@@ -10,14 +10,10 @@ MODEL:
     APE: False
     DROP_PATH_RATE: 0.3
     PATCH_NORM: True
-  WEIGHTS: "models/coco/instance-segmentation/model_final_swinS.pkl"
+  WEIGHTS: "swin_small_patch4_window7_224.pkl"
   PIXEL_MEAN: [123.675, 116.280, 103.530]
   PIXEL_STD: [58.395, 57.120, 57.375]
-SOLVER:
-  IMS_PER_BATCH: 24
-  STEPS: (3035, 3288, 6070, 6576)
-  MAX_ITER: 6829
-TEST:
-  EVAL_PERIOD: 1500
-
-
+DATASETS:
+  DATA_PATH: ""
+  TRAIN: ("endovis-2017_train_fold0",)
+  TEST: ("endovis-2017_val_fold0",)

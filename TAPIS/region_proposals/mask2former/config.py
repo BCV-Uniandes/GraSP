@@ -114,3 +114,5 @@ def add_maskformer2_config(cfg):
     cfg.MODEL.MASK_FORMER.IMPORTANCE_SAMPLE_RATIO = 0.75
 
     # cfg.TEST.DETECTIONS_PER_IMAGE = 200
+    
+    cfg.DATASETS.DATA_PATH = ""

@@ -50,6 +50,51 @@ from mask2former import (
     add_maskformer2_config,
 )
 
+# Register new dataset for instance segmentation with its COCO JSON
+from mask2former.data.datasets.register_coco_dataset import register_coco_instances
+import json
+
+def register_surgical_dataset(cfg):
+    dataset_name = cfg.DATASETS.TRAIN[0].split('_')[0]
+    dataset_path = cfg.DATASETS.DATA_PATH
+    
+    # Register GraSP
+    if dataset_name == 'grasp':
+        cats_data = sorted(json.load(open(os.path.join(dataset_path, 'annotations', 'grasp_short-term_train_polygon.json')))['categories'], key = lambda x: x['id'])
+        metadata = {'thing_dataset_id_to_contiguous_id': {cat['id']:c_id for c_id,cat in enumerate(cats_data)},
+                    'thing_classes': [cat['name'] for cat in cats_data],}
+        
+        for split in ['train','test','fold1','fold2']:
+            json_file = os.path.join(dataset_path, 'annotations', f'grasp_short-term_{split}_polygon.json')
+            image_root = os.path.join(dataset_path, 'frames')
+            register_coco_instances(f'grasp_{split}', metadata, json_file, image_root)
+    
+    # Register Endovis 2017
+    elif dataset_name == 'endovis-2017':
+        cats_data = sorted(json.load(open(os.path.join(dataset_path, 'annotations', 'Fold0', 'train.json')))['categories'], key = lambda x: x['id'])
+        metadata = {'thing_dataset_id_to_contiguous_id':{cat['id']:c_id for c_id,cat in enumerate(cats_data)},
+                    'thing_classes':[cat['name'] for cat in cats_data],}
+        
+        for fold in range(4):
+            for split in ['train','val']:
+                json_file = os.path.join(dataset_path, 'annotations', f'Fold{fold}', f'{split}.json')
+                image_root = os.path.join(dataset_path, 'images')
+                register_coco_instances(f'endovis-2017_{split}_fold{fold}', metadata, json_file, image_root)
+    
+    # Register Endovis 2018
+    elif dataset_name == 'endovis-2018':
+        cats_data = sorted(json.load(open(os.path.join(dataset_path, 'annotations', 'train.json')))['categories'], key = lambda x: x['id'])
+        metadata = {'thing_dataset_id_to_contiguous_id':{cat['id']:c_id for c_id,cat in enumerate(cats_data)},
+                    'thing_classes':[cat['name'] for cat in cats_data],}
+        
+        for split in ['train','val']:
+            json_file = os.path.join(dataset_path, 'annotations', f'{split}.json')
+            image_root = os.path.join(dataset_path, split)
+            register_coco_instances(f'endovis-2018_{split}', metadata, json_file, image_root)
+    
+    else:
+        print(f'Unrecognized surgical dataset {dataset_name}')
+
 
 class Trainer(DefaultTrainer):
     """
@@ -291,6 +336,7 @@ def setup(args):
 
 def main(args):
     cfg = setup(args)
+    register_surgical_dataset(cfg)
     # breakpoint()
     if args.eval_only:
         model = Trainer.build_model(cfg)

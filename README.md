@@ -78,6 +78,10 @@ $ wget http://157.253.243.19/GraSP/videos.tar.gz
 
 **Note:** All compressed archives **contain a README file** with further details and instructions on the data's structure and format. 
 
+### Alternative Download Methods
+
+In case you cannot download the files from our servers, you can download the **lighter version of our dataset (the version sampled at 1fps)** from this [**Google Drive link**](https://drive.google.com/file/d/15tzetVAGRvBRyhRTscLDf0SfDfMloSBX/view?usp=sharing), and the [1fps to 30fps association file](https://drive.google.com/file/d/1E4_W7DWS84G9ywo5GCHb7tets_2pe9Cz/view?usp=sharing). For now, we only provide the 1fps version with this alternative downloading option, but we are also working to upload all the files to the cloud.
+
 ### Main Dataset to Run our Models
 
 The ```GraSP_30fps.tar.gz``` is the only archive **necessary to run our code**. Hence, to download and uncompress this file, run the following command in a Linux terminal:
@@ -142,7 +146,7 @@ If you have any doubts, questions, issues, corrections, or comments, please emai
 
 ## Citing GraSP
 
-If you find GraSP or TAPIS useful for your research (or its previous versions PSI-AVA, TAPIR and MATIS), please include the following BibTex citations in your papers.
+If you find GraSP or TAPIS useful for your research (or its previous versions, PSI-AVA, TAPIR, and MATIS), please include the following BibTex citations in your papers.
 
 ```BibTeX
 @article{ayobi2024pixelwise,
