@@ -37,7 +37,13 @@ $ pip install -r requirements.txt
 
 ## Data Preparation
 
-In this [link](http://157.253.243.19/TAPIS), you will find our preprocessed data files, region proposals, and pre-trained models. We provide a README file with instructions about the data structures and the files in the link. Download these files and locate them in a directory named GraSP in the data directory of this repository. Please also include the video frames. In the end, the repository must have the following structure.
+In this [link](http://157.253.243.19/TAPIS/TAPIS.tar.gz), you will find a compressed archive with our preprocessed data files, region proposals, and pre-trained models. We provide a README file with instructions about the data structures and the files in the link. Download and uncompress these files with the following command.
+
+```sh
+$ wget http://157.253.243.19/TAPIS/TAPIS.tar.gz
+$ tar -xzvf TAPIS.tar.gz
+```
+Then, locate the extracted files in a directory named GraSP inside the data directory of this repository. Please also include the video frames. In the end, the repository must have the following structure.
 
 ```tree
 TAPIS
@@ -102,16 +108,20 @@ TAPIS
 |__tools
 ```
 
-Feel free to use soft/hard linking to other paths or to modify the directory structure, names, or locations of the files. However, you may also have to modify the .yaml config files or the bash running scripts. 
+Feel free to use soft/hard linking to other paths or to modify the directory structure, names, or locations of the files. However, you may also have to alter the .yaml config files or the bash running scripts. 
+
+### Alternative Doenload Methods
+
+If you cannot download the files from our server, you can find the compressed archive in this [Google Drive Link](https://drive.google.com/file/d/1qFUwzmT0c14GE73VEK15saI2AHnszxgB/view?usp=sharing).
 
 ## Running the code
 
-| Task | cross-val mAP | test mAP | config | run file | model |
+| Task | cross-val mAP | test mAP | config | run file | model path |
 | ----- | ----- | ----- | ----- | ----- | ----- |
-| Phases | 72.87 $\pm$ 1.66 | 74.06 | [PHASES](https://github.com/BCV-Uniandes/GraSP/blob/main/TAPIS/configs/GraSP/TAPIS_PHASES.yaml) | [phases](https://github.com/BCV-Uniandes/GraSP/blob/main/TAPIS/run_files/grasp_phases.sh) | [phases](http://157.253.243.19/TAPIS/pretrained_models/PHASES/) |
-| Steps | 49.165 $\pm$ 0.004 | 49.45 | [STEPS](https://github.com/BCV-Uniandes/GraSP/blob/main/TAPIS/configs/GraSP/TAPIS_STEPS.yaml) | [steps](https://github.com/BCV-Uniandes/GraSP/blob/main/TAPIS/run_files/grasp_steps.sh) | [steps](http://157.253.243.19/TAPIS/pretrained_models/STEPS/) |
-| Instruments | 90.28 $\pm$ 0.83 | 89.09 | [INSTRUMENTS](https://github.com/BCV-Uniandes/GraSP/blob/main/TAPIS/configs/GraSP/TAPIS_INSTRUMENTS.yaml) | [instruments](https://github.com/BCV-Uniandes/GraSP/blob/main/TAPIS/run_files/grasp_instruments.sh) | [instruments](http://157.253.243.19/TAPIS/pretrained_models/INSTRUMENTS/) |
-| Actions | 34.27 $\pm$ 1.76 | 39.50 | [ACTIONS](https://github.com/BCV-Uniandes/GraSP/blob/main/TAPIS/configs/GraSP/TAPIS_ACTIONS.yaml) | [actions](https://github.com/BCV-Uniandes/GraSP/blob/main/TAPIS/run_files/grasp_actions.sh) | [actions](http://157.253.243.19/TAPIS/pretrained_models/ACTIONS/) |
+| Phases | 72.87 $\pm$ 1.66 | 74.06 | [PHASES](https://github.com/BCV-Uniandes/GraSP/blob/main/TAPIS/configs/GraSP/TAPIS_PHASES.yaml) | [phases](https://github.com/BCV-Uniandes/GraSP/blob/main/TAPIS/run_files/grasp_phases.sh) | *TAPIS/pretrained_models/PHASES* |
+| Steps | 49.165 $\pm$ 0.004 | 49.45 | [STEPS](https://github.com/BCV-Uniandes/GraSP/blob/main/TAPIS/configs/GraSP/TAPIS_STEPS.yaml) | [steps](https://github.com/BCV-Uniandes/GraSP/blob/main/TAPIS/run_files/grasp_steps.sh) | *TAPIS/pretrained_models/STEPS* |
+| Instruments | 90.28 $\pm$ 0.83 | 89.09 | [INSTRUMENTS](https://github.com/BCV-Uniandes/GraSP/blob/main/TAPIS/configs/GraSP/TAPIS_INSTRUMENTS.yaml) | [instruments](https://github.com/BCV-Uniandes/GraSP/blob/main/TAPIS/run_files/grasp_instruments.sh) | *TAPIS/pretrained_models/INSTRUMENTS* |
+| Actions | 34.27 $\pm$ 1.76 | 39.50 | [ACTIONS](https://github.com/BCV-Uniandes/GraSP/blob/main/TAPIS/configs/GraSP/TAPIS_ACTIONS.yaml) | [actions](https://github.com/BCV-Uniandes/GraSP/blob/main/TAPIS/run_files/grasp_actions.sh) | *TAPIS/pretrained_models/ACTIONS* |
 
 We provide bash scripts with the default parameters to evaluate each GraSP task. Please first download our preprocessed data files and pretrained models as instructed earlier and run the following commands to run evaluation on each task:
 
@@ -126,7 +136,47 @@ You can easily modify the bash scripts to train our models. Just set ```TRAIN.EN
 
 ### Evaluation metrics
 
-Although our codes are configured to evaluate the model's performance after each epoch, you can manually evaluate your model's predictions using our evaluation codes and implementations. For this purpose, you can run the [evaluate script](https://github.com/BCV-Uniandes/GraSP/blob/main/TAPIS/tapis/evaluate.py) and provide the required paths in the arguments as documented in the script. 
+Although our codes are configured to evaluate the model's performance after each epoch, you can easily evaluate your model's predictions using our evaluation codes and implementations. For this purpose, you can run the [evaluate script](https://github.com/BCV-Uniandes/GraSP/blob/main/TAPIS/tapis/evaluate.py) and provide the required paths in the arguments as documented in the script. You can run this script on the output files of the [detectron2](https://github.com/facebookresearch/detectron2) library using the ```--filter``` argument, or you can provide your predictions in the following format:
+
+```tree
+[
+      {"<frame/name>":
+            
+            {
+             # For long-term tasks
+             "<phase/step>_score_dist": [class_1_score, ..., class_N_score],
+
+             # For short-term tasks
+             "instances": 
+             [
+                 {
+                  "bbox": [x_min, y_min, x_max, y_max],
+                  "<instruments/actions>_score_dist": [class_1_score, ..., class_N_score],
+                  
+                  # For instrument segmentation
+                  "segment" <Segmentation in RLE format>
+                 } 
+             ]
+            }
+      },
+      ...
+]
+```
+
+You can run the ```evaluate.py``` script as follows:
+
+```sh
+$ python evaluate.py --coco_anns_path /path/to/coco/annotations/json \
+--pred-path /path/to/predictions/json or pth \
+--output_path /path/to/output/directory \
+--tasks <instruments/actions/phases/steps> \
+--metrics <mAP/mAP@0.5IoU_box/mAP@0.5IoU_segm/mIoU> \
+(optional) --masks-path /path/to/segmentation/masks \
+# Optional for detectron2 outputs
+--filter \
+--slection <topk/thresh/cls_thresh/...> \
+--selection_info <filtering info> 
+```
 
 ## Instrument Segmentation Baseline
 
@@ -184,9 +234,11 @@ Our code stores the region features corresponding to the predicted segments in t
 $ python match_annots_n_preds.py 
 ```
 
-## Running MATIS or TAPIR
+### MATIS Baseline for Endovis 2017 and 2018
 
-Coming soon!
+You can also run the segmentation baseline for the [Endovis 2017](https://endovissub2017-roboticinstrumentsegmentation.grand-challenge.org/) and [Endovis 2018](https://endovissub2018-roboticscenesegmentation.grand-challenge.org/) datasets, as done in our previous [MATIS](https://arxiv.org/abs/2303.09514) paper. We recommend checking the paper and the [MATIS repo](https://github.com/BCV-Uniandes/MATIS). <br/>
+
+To run our segmentation baseline in the Endovis 2017 and 2018 datasets, please download the preprocessed frames, instances annotations, and pretrained models from this [link](http://157.253.243.19/MATIS/) as instructed in the [MATIS repo](https://github.com/BCV-Uniandes/MATIS). Then run the segmentation baseline as previously instructed but using the provided configuration files for [Endovis 2017](https://github.com/BCV-Uniandes/GraSP/tree/main/TAPIS/region_proposals/configs/endovis_2017) or [Endovis 2018](https://github.com/BCV-Uniandes/GraSP/tree/main/TAPIS/region_proposals/configs/endovis_2018), and indicating the path to the downloaded data with the ```DATASETS.DATA_PATH``` option
 
 ## Contact
 

@@ -59,21 +59,39 @@ def main(coco_ann_path, pred_path, tasks, metrics, output_dir, sufix, masks_path
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Evaluation parser')
-    parser.add_argument('--coco-ann-path', default=None, type=str, help='path to coco style anotations')
-    parser.add_argument('--pred-path', default=None, type=str, help='path to predictions')
-    parser.add_argument('--filter', action='store_true', help='path to predictions')
-    parser.add_argument('--tasks', nargs='+', help='tasks to be evaluated', required=True, default=None)
-    parser.add_argument('--metrics', nargs='+', help='metrics to be evaluated',
-                        choices=['mAP', 'mAP@0.5IoU_box', 'mAP@0.5IoU_segm', 'mIoU', 'mIoU_mAP@0.5',
-                                 'classification', 'detection','inst_segmentation', 
-                                 'sem_segmentation', 'segmentation'],
-                        required=True, default=None)
-    parser.add_argument('--masks-path', default=None, type=str, help='path to predictions')
+    parser.add_argument('--coco-ann-path', default=None, type=str, required=True, help='Path to coco anotations')
+    parser.add_argument('--pred-path', default=None, type=str, required=True, help='Path to predictions')
+    parser.add_argument('--filter', action='store_true', help='Filter predictions')
+    parser.add_argument('--tasks', nargs='+', help='Tasks to be evaluated', default=None, required=True)
+    parser.add_argument('--metrics', nargs='+', help='Metrics to be evaluated',
+                        choices=['mAP', # Classification mean Average Precision
+                                 'mAP@0.5IoU_box', # Detection mean Average Precision with 0.5 bounding box IoU threshold
+                                 'mAP@0.5IoU_segm', # Instance Segmentation mean Average Precision with 0.5 mask IoU threshold
+                                 'mIoU', # Semantic segmentation mean Intersection over Union
+                                 'mIoU_mAP@0.5', # Semantic segmentation IoU and instance segmentation mean Average Precision with a 0.5 mask threshold
+                                 'classification', # Same as 'mAP' (Classification mean Average Precision)
+                                 'detection', # Same as 'mAP@IoU_box' (Detection mean Average Precision with 0.5 bounding box IoU threshold)
+                                 'inst_segmentation', # Same as 'mAP@0.5IoU_segm' (Instance Segmentation mean Average Precision with 0.5 mask IoU threshold)
+                                 'sem_segmentation', # Same as 'mIoU' (Semantic segmentation mean Intersection over Union)
+                                 'segmentation' # Same as 'mIoU_mAP@0.5' (Semantic segmentation IoU and instance segmentation mean Average Precision with a 0.5 mask threshold)
+                                 ],
+                        default=None,
+                        required=True)
+    parser.add_argument('--masks-path', type=str, required=False, help='Path to semantic segmentation ground truth images')
     parser.add_argument('--selection', type=str, default='thresh', 
-                        choices=['thresh', 'topk', 'topk_thresh', 'cls_thresh', 'cls_topk', 'cls_topk_thresh', 'all'], 
-                        help='Prediction selection method')
-    parser.add_argument('--selection_info', help='Hypermarameters to perform selection', default=0.75)
-    parser.add_argument('--output_path', default=None, type=str, help='path to predictions')
+                        choices=['thresh', # General threshold filtering
+                                'topk', # General top k filtering
+                                'topk_thresh', # Threshold and top k filtering
+                                'cls_thresh', # Per-class threshold filtering
+                                'cls_topk', # Per-class top k filtering
+                                'cls_topk_thresh', # Per-class top k and and threshold filtering
+                                'all' # No filtering
+                                ], 
+                        required=False,
+                        default=None,
+                        help='Prediction filtering method')
+    parser.add_argument('--selection_info', help='Hypermarameters to perform filtering', required=False, default=0.75)
+    parser.add_argument('--output_path', default=None, type=str, help='Output directory')
 
     args = parser.parse_args()
     print(args)

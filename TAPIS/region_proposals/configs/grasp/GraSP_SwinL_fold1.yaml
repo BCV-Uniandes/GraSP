@@ -12,6 +12,7 @@ MODEL:
     PATCH_NORM: True
     PRETRAIN_IMG_SIZE: 384
   WEIGHTS: "swin_large_patch4_window12_384_22k.pkl"
+  # Keeping the original COCO means and stds provided better transfer learning results than using GraSP's
   PIXEL_MEAN: [123.675, 116.280, 103.530]
   PIXEL_STD: [58.395, 57.120, 57.375]
   MASK_FORMER:

@@ -27,91 +27,307 @@ def gather_info(coco_json):
     return return_dict, id2name
 
 def box_iou(bb1,bb2):
-    x1 = max(bb1[0],bb2[0])
-    y1 = max(bb1[1],bb2[1])
-    x2 = min(bb1[2],bb2[2])
-    y2 = min(bb1[3],bb2[3])
-    if x2<x1 or y2<y1:
+    '''
+    This function computes the Intersection over Union (IoU) of two bounding boxes.
+    
+    Parameters:
+    bb1, bb2 : list or tuple of 4 elements
+        Each contains the coordinates of a bounding box in the format [x_min, y_min, x_max, y_max].
+    
+    Returns:
+    float
+        The IoU of the two bounding boxes, a value between 0 and 1.
+    '''
+    
+    # Determine the coordinates of the intersection rectangle
+    x1 = max(bb1[0], bb2[0])
+    y1 = max(bb1[1], bb2[1])
+    x2 = min(bb1[2], bb2[2])
+    y2 = min(bb1[3], bb2[3])
+    
+    # If there is no intersection, return IoU as 0
+    if x2 < x1 or y2 < y1:
         return 0.0
-    elif y2==y1 and bb1[1]==bb1[3]==bb2[1]==bb2[3]:
+    
+    # Special cases: vertical or horizontal line overlap
+    elif y2 == y1 and bb1[1] == bb1[3] == bb2[1] == bb2[3]:
         return 1
-    elif x2==x1 and bb1[0]==bb1[2]==bb2[0]==bb2[2]:
+    elif x2 == x1 and bb1[0] == bb1[2] == bb2[0] == bb2[2]:
         return 1
-    inter = (x2-x1)*(y2-y1)
-    area1 = (bb1[2]-bb1[0])*(bb1[3]-bb1[1])
-    area2 = (bb2[2]-bb2[0])*(bb2[3]-bb2[1])
-    if (area1+area2-inter)==0:
+    
+    # Compute the area of the intersection rectangle
+    inter = (x2 - x1) * (y2 - y1)
+    
+    # Compute the area of both bounding boxes
+    area1 = (bb1[2] - bb1[0]) * (bb1[3] - bb1[1])
+    area2 = (bb2[2] - bb2[0]) * (bb2[3] - bb2[1])
+    
+    # Check for potential division by zero
+    if (area1 + area2 - inter) == 0:
         breakpoint()
-    box_iou = inter/(area1+area2-inter)
-
-    assert box_iou>=0 and box_iou<=1
+    
+    # Compute the IoU
+    box_iou = inter / (area1 + area2 - inter)
+    
+    # Ensure the IoU is within the valid range
+    assert box_iou >= 0 and box_iou <= 1
+    
     return box_iou
 
 def compute_mask_iou(m1,m2):
-    intersection = np.sum(m1*m2)
-    if intersection==0:
+    '''
+    This function computes the Intersection over Union (IoU) of two binary masks.
+    
+    Parameters:
+    m1, m2 : numpy arrays
+        Each contains a binary mask where pixels within the mask are 1 and outside are 0.
+    
+    Returns:
+    float
+        The IoU of the two masks, a value between 0 and 1.
+    '''
+    
+    # Compute the intersection of the two masks
+    intersection = np.sum(m1 * m2)
+    
+    # If there is no intersection, return IoU as 0
+    if intersection == 0:
         return 0.0
+    
+    # Compute the union of the two masks
     union = np.sum(m1) + np.sum(m2) - intersection
-    mask_iou = intersection/union
-    assert mask_iou>=0 and mask_iou<=1
+    
+    # Compute the IoU
+    mask_iou = intersection / union
+    
+    # Ensure the IoU is within the valid range
+    assert mask_iou >= 0 and mask_iou <= 1
+    
     return mask_iou
 
 def polygon_to_rle(polygons, width, height) -> dict:
+    '''
+    This function converts a list of polygons to a run-length encoding (RLE) format.
+    
+    Parameters:
+    polygons : list of lists
+        A list containing polygon coordinates, where each polygon is represented as a list of points.
+    width : int
+        The width of the image.
+    height : int
+        The height of the image.
+    
+    Returns:
+    dict
+        The RLE representation of the input polygons.
+    '''
+    
+    # Flatten the polygon coordinates and convert them to a list
     polys = [np.array(p).flatten().tolist() for p in polygons]
+    
+    # Convert the polygon coordinates to RLE format using the frPyObjects function
     rles = m.frPyObjects(polys, height, width)
+    
+    # Merge the RLEs into a single RLE
     return m.merge(rles)
 
 def rle_to_polygon(rle) -> dict:
+    '''
+    This function converts a run-length encoding (RLE) to polygon format.
+    
+    Parameters:
+    rle : dict
+        The RLE representation of a mask.
+    
+    Returns:
+    dict
+        The polygon representation of the mask.
+    '''
+    
+    # Decode the RLE to a binary mask
     mask = decode_rle_to_mask(rle)
+    
+    # Convert the binary mask to polygon format
     return mask_to_polygon(mask)
 
 def mask_to_polygon(mask):
+    '''
+    This function converts a binary mask to a list of polygons.
+    
+    Parameters:
+    mask : numpy array
+        A binary mask where the mask region is 1 and the background is 0.
+    
+    Returns:
+    list of lists
+        A list containing the polygon coordinates, where each polygon is represented as a list of points.
+    '''
+    
+    # Find contours in the binary mask
     contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    
+    # Initialize the list to store polygons
     polygons = []
+    
+    # Iterate through each contour found
     for contour in contours:
+        # Flatten and convert the contour points to a list
         contour = contour.squeeze().ravel().tolist()
-        if len(contour)%2 == 0 and len(contour)>=6:
+        
+        # Ensure the contour has an even number of points and has at least 3 points (6 values)
+        if len(contour) % 2 == 0 and len(contour) >= 6:
+            # Append the valid contour to the polygons list
             polygons.append(contour)
+    
+    # Return the list of polygons
     return polygons
 
 def mask_to_rle(mask):
+    '''
+    This function converts a binary mask to run-length encoding (RLE) format.
+    
+    Parameters:
+    mask : numpy array
+        A binary mask where the mask region is 1 and the background is 0.
+    
+    Returns:
+    dict
+        The RLE representation of the mask.
+    '''
+    
+    # Convert the binary mask to a Fortran-contiguous array and encode it to RLE format
     return m.encode(np.asfortranarray(mask))
     
 def decode_polygon_to_mask(polygons, width, height):
+    '''
+    This function converts polygons to a binary mask.
+    
+    Parameters:
+    polygons : list of lists
+        A list containing polygon coordinates, where each polygon is represented as a list of points.
+    width : int
+        The width of the image.
+    height : int
+        The height of the image.
+    
+    Returns:
+    numpy array
+        The binary mask where the mask region is 1 and the background is 0.
+    '''
+    
+    # Convert the polygons to run-length encoding (RLE) format
     rle = polygon_to_rle(polygons, width, height)
+    
+    # Decode the RLE to a binary mask
     return decode_rle_to_mask(rle)
 
 def decode_compressed_rle_to_mask(rle, dtype='uint8'):
+    '''
+    This function decodes a compressed run-length encoding (RLE) to a binary mask.
+    
+    Parameters:
+    rle : dict
+        The compressed RLE representation of a mask.
+    dtype : str, optional
+        The desired data type of the output mask. Default is 'uint8'.
+    
+    Returns:
+    numpy array
+        The binary mask where the mask region is 1 and the background is 0, with the specified data type.
+    '''
+    
+    # Create a copy of the RLE dictionary to avoid modifying the original
     compressed_rle_dict = rle.copy()
+    
+    # Decode the base64-encoded RLE counts string
     uncodedStr = base64.b64decode(rle['counts'])
-    uncompressedStr = zlib.decompress(uncodedStr,wbits = zlib.MAX_WBITS)  
-    compressed_rle_dict['counts'] = uncompressedStr 
+    
+    # Decompress the RLE counts string
+    uncompressedStr = zlib.decompress(uncodedStr, wbits=zlib.MAX_WBITS)
+    
+    # Update the counts in the copied RLE dictionary with the decompressed string
+    compressed_rle_dict['counts'] = uncompressedStr
+    
+    # Decode the RLE to a binary mask and convert it to the specified data type
     mask = m.decode(compressed_rle_dict).astype(dtype)
+    
+    # Return the binary mask
     return mask
 
+
 def decode_rle_to_mask(rle, dtype='uint8'):
-    mask = m.decode(rle).astype(dtype)
+    '''
+    This function decodes a run-length encoding (RLE) to a binary mask.
+    
+    Parameters:
+    rle : dict
+        The RLE representation of a mask.
+    
+    Returns:
+    numpy array
+        The binary mask where the mask region is 1 and the background is 0.
+    '''
+    
+    # Decode the RLE to a binary mask and convert it to unsigned 8-bit integer type
+    mask = m.decode(rle).astype('uint8')
+    
+    # Return the binary mask
     return mask
 
 def mask_to_bbox(mask, full_coordinates=False):
-    ys,xs = np.where(mask>0)
+    '''
+    This function converts a binary mask to a bounding box.
+    
+    Parameters:
+    mask : numpy array
+        A binary mask where the mask region is 1 and the background is 0.
+    full_coordinates : bool, optional
+        If True, returns the bounding box as [x1, y1, x2, y2].
+        If False, returns the bounding box as [x1, y1, width, height].
+    
+    Returns:
+    list
+        The bounding box coordinates. The format depends on the value of full_coordinates.
+    '''
+    
+    # Find the y and x coordinates where the mask is greater than 0
+    ys, xs = np.where(mask > 0)
+    
+    # Determine the minimum and maximum x and y coordinates of the mask
     x1 = np.min(xs)
     x2 = np.max(xs)
     y1 = np.min(ys)
     y2 = np.max(ys)
     
+    # Return the bounding box coordinates
     if full_coordinates:
+        # Return as [x1, y1, x2, y2]
         return [x1, y1, x2, y2]
+    
+    # Return as [x1, y1, width, height]
+    return [x1, y1, x2 - x1, y2 - y1]
 
-    return [x1, y1, x2-x1, y2-y1]
-
-def xywhbbox_to_dxdydxdybbox(bbox, width, height):
-    d_bbox = [bbox[0], bbox[1], bbox[2]+bbox[0], bbox[3]+bbox[1]]
-    d_bbox[0] /= width
-    d_bbox[1] /= height
-    d_bbox[2] /= width
-    d_bbox[3] /= height
-    return d_bbox
+def xywh_to_x1y1x2y2(bbox):
+    '''
+    This function converts a bounding box from [x, y, width, height] format to [x1, y1, x2, y2] format.
+    
+    Parameters:
+    bbox : list or tuple of 4 elements
+        The bounding box in [x, y, width, height] format.
+    
+    Returns:
+    list
+        The bounding box in [x1, y1, x2, y2] format, with coordinates rounded to the nearest integer.
+    '''
+    
+    # Round the coordinates and dimensions of the bounding box
+    bbox = list(map(round, bbox))
+    
+    # Convert to [x1, y1, x2, y2] format
+    xy_bbox = [bbox[0], bbox[1], bbox[2] + bbox[0], bbox[3] + bbox[1]]
+    
+    # Return the converted bounding box
+    return xy_bbox
 
 def roundbox(box):
     keys = box.split(' ')

@@ -3,6 +3,7 @@ MODEL:
     FREEZE_AT: 0
     NAME: "build_resnet_backbone"
   WEIGHTS: "models/coco/instance-segmentation/model_final_R50.pkl"
+  # Keeping the original COCO means and stds provided better transfer learning results than using Endovis 2018's
   PIXEL_MEAN: [123.675, 116.280, 103.530]
   PIXEL_STD: [58.395, 57.120, 57.375]
   RESNETS:

@@ -80,7 +80,7 @@ $ wget http://157.253.243.19/GraSP/videos.tar.gz
 
 ### Alternative Download Methods
 
-In case you cannot download the files from our servers, you can download the **lighter version of our dataset (the version sampled at 1fps)** from this [**Google Drive link**](https://drive.google.com/file/d/15tzetVAGRvBRyhRTscLDf0SfDfMloSBX/view?usp=sharing), and the [1fps to 30fps association file](https://drive.google.com/file/d/1E4_W7DWS84G9ywo5GCHb7tets_2pe9Cz/view?usp=sharing). For now, we only provide the 1fps version with this alternative downloading option, but we are also working to upload all the files to the cloud.
+In case you cannot download the files from our servers, you can download the **lighter version of our dataset (the version sampled at 1fps)** from this [**Google Drive link**](https://drive.google.com/file/d/15tzetVAGRvBRyhRTscLDf0SfDfMloSBX/view?usp=sharing), and the [1fps to 30fps association file](https://drive.google.com/file/d/1E4_W7DWS84G9ywo5GCHb7tets_2pe9Cz/view?usp=sharing). This alternative downloading option only includes the 1fps version of the dataset for now, but we are currently working to upload all the files to the cloud.
 
 ### Main Dataset to Run our Models
 
