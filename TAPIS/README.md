@@ -110,7 +110,7 @@ TAPIS
 
 Feel free to use soft/hard linking to other paths or to modify the directory structure, names, or locations of the files. However, you may also have to alter the .yaml config files or the bash running scripts. 
 
-### Alternative Doenload Methods
+### Alternative Download Methods
 
 If you cannot download the files from our server, you can find the compressed archive in this [Google Drive Link](https://drive.google.com/file/d/1qFUwzmT0c14GE73VEK15saI2AHnszxgB/view?usp=sharing).
 
