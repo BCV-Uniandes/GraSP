@@ -307,6 +307,28 @@ def mask_to_bbox(mask, full_coordinates=False):
     # Return as [x1, y1, width, height]
     return [x1, y1, x2 - x1, y2 - y1]
 
+def xywhbbox_to_dxdydxdybbox(bbox, width, height):
+    '''
+    Convert a bounding box from (x, y, width, height) format (xywh) 
+    to (x_min, y_min, x_max, y_max) format, then normalize it by the given image dimensions.
+
+    `bbox`: The bounding box in (x, y, width, height) format.
+    `width` and `height`: The width and height of the image to normalize the coordinates.
+    '''
+    
+    # Create a new bounding box in (x_min, y_min, x_max, y_max) format.
+    # bbox[0] is x (left), bbox[1] is y (top), bbox[2] is width, bbox[3] is height.
+    d_bbox = [bbox[0], bbox[1], bbox[2] + bbox[0], bbox[3] + bbox[1]]
+    
+    # Normalize the bounding box coordinates by dividing by image width and height.
+    d_bbox[0] /= width  # Normalize x_min (left) by image width.
+    d_bbox[1] /= height # Normalize y_min (top) by image height.
+    d_bbox[2] /= width  # Normalize x_max (right) by image width.
+    d_bbox[3] /= height # Normalize y_max (bottom) by image height.
+    
+    # Return the normalized (x_min, y_min, x_max, y_max) bounding box.
+    return d_bbox
+
 def xywh_to_x1y1x2y2(bbox):
     '''
     This function converts a bounding box from [x, y, width, height] format to [x1, y1, x2, y2] format.
