@@ -112,7 +112,7 @@ Feel free to use soft/hard linking to other paths or to modify the directory str
 
 ### Alternative Download Methods
 
-If you cannot download the files from our server, you can find the compressed archive in this [Google Drive Link](https://drive.google.com/file/d/1qFUwzmT0c14GE73VEK15saI2AHnszxgB/view?usp=sharing).
+If you cannot download the files from our server, you can find the compressed archive in this [Google Drive Link](https://drive.google.com/file/d/1Lf_OeSUzSRxyvcVSsH8_GkNLTYMmPnhV/view?usp=sharing).
 
 ## Running the code
 
