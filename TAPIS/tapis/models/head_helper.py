@@ -6,6 +6,7 @@
 import torch
 import torch.nn as nn
 from detectron2.layers import ROIAlign
+from .build import MODEL_REGISTRY
 
 FEATURE_SIZE = {'faster': 1024,
                 'mask': 1024,
@@ -112,7 +113,7 @@ class ResNetRoIHead(nn.Module):
                 "function.".format(act_func)
             )
 
-    def forward(self, inputs, bboxes, features=None):
+    def forward(self, inputs, bboxes=None, features=None, **kwargs):
         assert (
             len(inputs) == self.num_pathways
         ), "Input tensor does not contain {} pathway".format(self.num_pathways)
@@ -146,13 +147,11 @@ class ResNetRoIHead(nn.Module):
 
         x = self.projection(x)
         
-        if self.training and self.act_func == "sigmoid" or not self.training:
+        if self.act_func == "sigmoid" or not self.training:
             x = self.act(x)
         
         return x
-        
-
-
+    
 class ResNetBasicHead(nn.Module):
     """
     ResNe(X)t 3D head.
@@ -169,6 +168,8 @@ class ResNetBasicHead(nn.Module):
         pool_size,
         dropout_rate=0.0,
         act_func="softmax",
+        detach_final_fc=False,
+        cfg=None,
     ):
         """
         The `__init__` method of any subclass should also contain these
@@ -187,12 +188,21 @@ class ResNetBasicHead(nn.Module):
                 dropout.
             act_func (string): activation function to use. 'softmax': applies
                 softmax on the output. 'sigmoid': applies sigmoid on the output.
+            detach_final_fc (bool): if True, detach the fc layer from the
+                gradient graph. By doing so, only the final fc layer will be
+                trained.
+            cfg (struct): The config for the current experiment.
         """
         super(ResNetBasicHead, self).__init__()
         assert (
             len({len(pool_size), len(dim_in)}) == 1
         ), "pathway dimensions are not consistent."
         self.num_pathways = len(pool_size)
+        self.detach_final_fc = detach_final_fc
+        self.cfg = cfg
+        self.local_projection_modules = []
+        self.predictors = nn.ModuleList()
+        self.l2norm_feats = False
 
         for pathway in range(self.num_pathways):
             if pool_size[pathway] is None:
@@ -203,9 +213,6 @@ class ResNetBasicHead(nn.Module):
 
         if dropout_rate > 0.0:
             self.dropout = nn.Dropout(dropout_rate)
-        
-        self.extra_pool = nn.AvgPool3d([pool_size[0][0], pool_size[0][0], 1], stride=1)
-        
         # Perform FC in a fully convolutional manner. The FC layer will be
         # initialized with a different std comparing to convolutional layers.
         self.projection = nn.Linear(sum(dim_in), num_classes, bias=True)
@@ -215,13 +222,14 @@ class ResNetBasicHead(nn.Module):
             self.act = nn.Softmax(dim=4)
         elif act_func == "sigmoid":
             self.act = nn.Sigmoid()
+        elif act_func == "none":
+            self.act = None
         else:
             raise NotImplementedError(
-                "{} is not supported as an activation"
-                "function.".format(act_func)
+                "{} is not supported as an activation" "function.".format(act_func)
             )
 
-    def forward(self, inputs):
+    def forward(self, inputs, **kwargs):
         assert (
             len(inputs) == self.num_pathways
         ), "Input tensor does not contain {} pathway".format(self.num_pathways)
@@ -232,20 +240,22 @@ class ResNetBasicHead(nn.Module):
         x = torch.cat(pool_out, 1)
         # (N, C, T, H, W) -> (N, T, H, W, C).
         x = x.permute((0, 2, 3, 4, 1))
-        # handle extra heads need of extra pooling
-        x = self.extra_pool(x)
         # Perform dropout.
         if hasattr(self, "dropout"):
             x = self.dropout(x)
-        x = self.projection(x)
 
-        # Performs fully convlutional inference.
+        x_proj = self.projection(x)
+
         if not self.training:
-            x = self.act(x)
-            x = x.mean([1, 2, 3])
+            if self.act is not None:
+                x_proj = self.act(x_proj)
+            # Performs fully convlutional inference.
+            if x_proj.ndim == 5 and x_proj.shape[1:4] > torch.Size([1, 1, 1]):
+                x_proj = x_proj.mean([1, 2, 3])
 
-        x = x.view(x.shape[0], -1)
-        return x
+        x_proj = x_proj.view(x_proj.shape[0], -1)
+
+        return x_proj
 
 
 class TransformerBasicHead(nn.Module):
@@ -291,9 +301,10 @@ class TransformerBasicHead(nn.Module):
                 "function.".format(act_func)
             )
 
-    def forward(self, x, features=None, boxes_mask=None):
+    def forward(self, inputs, cls_idx=1, **kwargs):
+        x = inputs
         if self.cls_embed and not self.recognition:
-            x = x[:, 0]
+            x = x[:, cls_idx]
         elif self.cls_embed:
             x = x[:,1:].mean(1)
         else:
@@ -307,7 +318,7 @@ class TransformerBasicHead(nn.Module):
             x = self.act(x)
         return x
 
-
+@MODEL_REGISTRY.register()
 class TransformerRoIHead(nn.Module):
     """
     Region classification head in TAPIS. 
@@ -316,7 +327,7 @@ class TransformerRoIHead(nn.Module):
     def __init__(
         self,
         cfg,
-        num_classes,
+        num_classes=0,
         dropout_rate=0.0,
         act_func="softmax",
         cls_embed=False
@@ -327,6 +338,7 @@ class TransformerRoIHead(nn.Module):
         if dropout_rate > 0.0:
             self.dropout = nn.Dropout(dropout_rate)
         self.cls_embed = cls_embed
+        self.use_video = cfg.TASKS.USE_VIDEO
         
         # Region features vector dimension 
         dim_features = cfg.FEATURES.DIM_FEATURES
@@ -334,60 +346,66 @@ class TransformerRoIHead(nn.Module):
         # Use additional linear layers before temporal pooling
         self.use_prev = cfg.MODEL.TIME_MLP and cfg.MODEL.PREV_MLP
         
-        if cfg.MODEL.DECODER:
-            # Transform features to the same dimensions as MViT's output
-            self.feat_project = nn.Sequential(nn.Linear(dim_features,
-                                                        768,
-                                                        bias=True))
-            
-            # Transformer decoder layer to do self-attention followed by cross-attention
-            decoder_layer = nn.TransformerDecoderLayer(768, 
-                                                       cfg.MODEL.DECODER_NUM_HEADS, 
-                                                       dim_feedforward=cfg.MODEL.DECODER_HID_DIM,
-                                                       batch_first=True)
-            # Transformer decoder
-            self.decoder = nn.TransformerDecoder(decoder_layer, 
-                                                 cfg.MODEL.DECODER_NUM_LAYERS)
-            dim_out = 768
-            
-        elif cfg.MODEL.TIME_MLP:
-            if self.use_prev:
-                # Linear layers previous to temporal pooling
-                prev_layers = []
-                for i in range(cfg.MODEL.PREV_MLP_LAYERS):
-                    prev_layers.append(nn.Linear(cfg.MODEL.PREV_MLP_HID_DIM if i>0 else 768,
-                                                cfg.MODEL.PREV_MLP_HID_DIM if i<cfg.MODEL.PREV_MLP_LAYERS-1 else cfg.MODEL.PREV_MLP_OUT_DIM,
+        if self.use_video:
+        
+            if cfg.MODEL.DECODER:
+                # Transform features to the same dimensions as MViT's output
+                self.feat_project = nn.Sequential(nn.Linear(dim_features,
+                                                            768,
+                                                            bias=True))
+                
+                # Transformer decoder layer to do self-attention followed by cross-attention
+                decoder_layer = nn.TransformerDecoderLayer(768, 
+                                                        cfg.MODEL.DECODER_NUM_HEADS, 
+                                                        dim_feedforward=cfg.MODEL.DECODER_HID_DIM,
+                                                        batch_first=True)
+                # Transformer decoder
+                self.decoder = nn.TransformerDecoder(decoder_layer, 
+                                                    cfg.MODEL.DECODER_NUM_LAYERS)
+                dim_out = 768
+                
+            elif cfg.MODEL.TIME_MLP:
+                if self.use_prev:
+                    # Linear layers previous to temporal pooling
+                    prev_layers = []
+                    for i in range(cfg.MODEL.PREV_MLP_LAYERS):
+                        prev_layers.append(nn.Linear(cfg.MODEL.PREV_MLP_HID_DIM if i>0 else 768,
+                                                    cfg.MODEL.PREV_MLP_HID_DIM if i<cfg.MODEL.PREV_MLP_LAYERS-1 else cfg.MODEL.PREV_MLP_OUT_DIM,
+                                                    bias=True))
+                        if i<cfg.MODEL.PREV_MLP_LAYERS-1:
+                            prev_layers.append(nn.ReLU())
+                    self.prev_pool_project = nn.Sequential(*prev_layers)
+                
+                # Linear layers after temporal pooling
+                post_layers = []
+                for i in range(cfg.MODEL.POST_MLP_LAYERS):
+                    post_layers.append(nn.Linear(cfg.MODEL.POST_MLP_HID_DIM if i>0 else (cfg.MODEL.PREV_MLP_HID_DIM if self.use_prev else 768),
+                                                cfg.MODEL.POST_MLP_HID_DIM if i<cfg.MODEL.POST_MLP_LAYERS-1 else cfg.MODEL.POST_MLP_OUT_DIM,
                                                 bias=True))
-                    if i<cfg.MODEL.PREV_MLP_LAYERS-1:
-                        prev_layers.append(nn.ReLU())
-                self.prev_pool_project = nn.Sequential(*prev_layers)
-            
-            # Linear layers after temporal pooling
-            post_layers = []
-            for i in range(cfg.MODEL.POST_MLP_LAYERS):
-                post_layers.append(nn.Linear(cfg.MODEL.POST_MLP_HID_DIM if i>0 else (cfg.MODEL.PREV_MLP_HID_DIM if self.use_prev else 768),
-                                             cfg.MODEL.POST_MLP_HID_DIM if i<cfg.MODEL.POST_MLP_LAYERS-1 else cfg.MODEL.POST_MLP_OUT_DIM,
-                                             bias=True))
-                if i<cfg.MODEL.POST_MLP_LAYERS-1:
-                    post_layers.append(nn.ReLU())
-            self.post_pool_project = nn.Sequential(*post_layers)
+                    if i<cfg.MODEL.POST_MLP_LAYERS-1:
+                        post_layers.append(nn.ReLU())
+                self.post_pool_project = nn.Sequential(*post_layers)
 
-            # Linear Layers to transform region feature vectors
-            feat_layers = []
-            for i in range(cfg.MODEL.FEAT_MLP_LAYERS):
-                feat_layers.append(nn.Linear(cfg.MODEL.FEAT_MLP_HID_DIM if i>0 else dim_features,
-                                             cfg.MODEL.FEAT_MLP_HID_DIM if i<cfg.MODEL.FEAT_MLP_LAYERS-1 else cfg.MODEL.FEAT_MLP_OUT_DIM,
-                                             bias=True))
-                if i<cfg.MODEL.FEAT_MLP_LAYERS-1:
-                    feat_layers.append(nn.ReLU())
-            self.feat_project = nn.Sequential(*feat_layers)
-            
-            dim_out = cfg.MODEL.FEAT_MLP_OUT_DIM + cfg.MODEL.POST_MLP_OUT_DIM
-            
+                # Linear Layers to transform region feature vectors
+                feat_layers = []
+                for i in range(cfg.MODEL.FEAT_MLP_LAYERS):
+                    feat_layers.append(nn.Linear(cfg.MODEL.FEAT_MLP_HID_DIM if i>0 else dim_features,
+                                                cfg.MODEL.FEAT_MLP_HID_DIM if i<cfg.MODEL.FEAT_MLP_LAYERS-1 else cfg.MODEL.FEAT_MLP_OUT_DIM,
+                                                bias=True))
+                    if i<cfg.MODEL.FEAT_MLP_LAYERS-1:
+                        feat_layers.append(nn.ReLU())
+                self.feat_project = nn.Sequential(*feat_layers)
+                
+                dim_out = cfg.MODEL.FEAT_MLP_OUT_DIM + cfg.MODEL.POST_MLP_OUT_DIM
+                
+            else:
+                self.mlp = nn.Sequential(nn.Linear(dim_features, 1024, bias=False),
+                                        nn.BatchNorm1d(1024))
+                dim_out = 1024 + 768
         else:
-            self.mlp = nn.Sequential(nn.Linear(dim_features, 1024, bias=False),
-                                    nn.BatchNorm1d(1024))
-            dim_out = 1024 + 768
+            num_classes = cfg.TASKS.NUM_CLASSES[0]
+            act_func = cfg.TASKS.HEAD_ACT[0]
+            dim_out = dim_features
         
         # Final classification layer 
         self.class_projection = nn.Sequential(nn.Linear(dim_out, num_classes, bias=True),)
@@ -405,35 +423,38 @@ class TransformerRoIHead(nn.Module):
                 "function.".format(act_func)
             )
     
-    def forward(self, inputs, features=None, boxes_mask=None):
+    def forward(self, inputs, features=None, boxes_mask=None, **kwargs):
         boxes_mask = boxes_mask.bool()
 
-        if self.cls_embed:
-            inputs = inputs[:, 1:, :]
-        
-        if self.cfg.MODEL.DECODER:
-            features = self.feat_project(features)
-            x = self.decoder(features, inputs, tgt_key_padding_mask=~boxes_mask)
-            x = x[boxes_mask]
-        
-        else:
-            if self.use_prev:
-                inputs = self.prev_pool_project(inputs)
+        if self.use_video:
+            if self.cls_embed:
+                inputs = inputs[:, 1:, :]
+            
+            if self.cfg.MODEL.DECODER:
+                features = self.feat_project(features)
+                x = self.decoder(features, inputs, tgt_key_padding_mask=~boxes_mask)
+                x = x[boxes_mask]
+            
+            else:
+                if self.use_prev:
+                    inputs = self.prev_pool_project(inputs)
+                    
+                x = inputs.mean(1)
                 
-            x = inputs.mean(1)
-            
-            if self.cfg.MODEL.TIME_MLP:
-                x = self.post_pool_project(x)
+                if self.cfg.MODEL.TIME_MLP:
+                    x = self.post_pool_project(x)
 
-            max_boxes = boxes_mask.shape[-1] 
-            
-            # Repeat pooled time features to match the batch dimensions of box proposals
-            x_boxes = x.unsqueeze(1).repeat(1,max_boxes,1)[boxes_mask] # Use box mask to remove padding
-            
-            features = features[boxes_mask] # Use box mask to remove padding
-            features = self.feat_project(features)
-            
-            x = torch.cat([x_boxes, features], dim=1)
+                max_boxes = boxes_mask.shape[-1] 
+                
+                # Repeat pooled time features to match the batch dimensions of box proposals
+                x_boxes = x.unsqueeze(1).repeat(1,max_boxes,1)[boxes_mask] # Use box mask to remove padding
+                
+                features = features[boxes_mask] # Use box mask to remove padding
+                features = self.feat_project(features)
+                
+                x = torch.cat([x_boxes, features], dim=1)
+        else:
+            x = features[boxes_mask]
 
         x = self.class_projection(x)
 
@@ -441,4 +462,7 @@ class TransformerRoIHead(nn.Module):
         if self.use_act or not self.training:
             x = self.act(x)
 
-        return x
+        if self.use_video:
+            return x
+        else:
+            return {self.cfg.TASKS.TASKS[0]:x}

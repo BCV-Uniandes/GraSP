@@ -86,10 +86,8 @@ if __name__ == "__main__":
                                 'cls_topk', # Per-class top k filtering
                                 'cls_topk_thresh', # Per-class top k and and threshold filtering
                                 'all' # No filtering
-                                ], 
-                        required=False,
-                        default=None,
-                        help='Prediction filtering method')
+                                ],
+                        required=False, help='Prediction filtering method')
     parser.add_argument('--selection_info', help='Hypermarameters to perform filtering', required=False, default=0.75)
     parser.add_argument('--output_path', default=None, type=str, help='Output directory')
 

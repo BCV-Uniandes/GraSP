@@ -14,7 +14,6 @@ from torch.nn.init import trunc_normal_
 
 import tapis.utils.weight_init_helper as init_helper
 from .attention import MultiScaleBlock
-from .attentionv2 import MultiScaleBlock as MultiScaleBlockv2
 from .batchnorm_helper import get_norm
 from .utils import (
     calc_mvit_feature_geometry,
@@ -23,7 +22,7 @@ from .utils import (
     validate_checkpoint_wrapper_import,
 )
 
-from . import head_helper, resnet_helper, stem_helper, stem_helperv2
+from . import head_helper, resnet_helper, stem_helper
 from .build import MODEL_REGISTRY
 
 try:
@@ -190,7 +189,7 @@ class SlowFast(nn.Module):
         self.norm_module = get_norm(cfg)
         # Extra heads for each task 
         self.tasks = cfg.TASKS.TASKS
-        self.enable_extra_heads = True if len(self.tasks) > 1 else False
+        self._region_tasks = {task for task in cfg.TASKS.TASKS if task in cfg.ENDOVIS_DATASET.REGION_TASKS}
         self.num_classes = cfg.TASKS.NUM_CLASSES
         self.act_fun = cfg.TASKS.HEAD_ACT
         self.num_pathways = 2
@@ -368,7 +367,7 @@ class SlowFast(nn.Module):
         )
 
         for idx, task in enumerate(self.tasks):
-            if task == 'tools' or task == 'actions':
+            if task in self._region_tasks:
 
                 extra_head = head_helper.ResNetRoIHead(
                     dim_in=[
@@ -420,7 +419,7 @@ class SlowFast(nn.Module):
                 )
             self.add_module("extra_heads_{}".format(task), extra_head)
 
-    def forward(self, x, bboxes=None, features=None):
+    def forward(self, x, bboxes=None, features=None, boxes_mask=None, **kwargs):
         out = {k:[] for k in self.tasks}
         x = self.s1(x)
         x = self.s1_fuse(x)
@@ -434,345 +433,16 @@ class SlowFast(nn.Module):
         x = self.s4(x)
         x = self.s4_fuse(x)
         x = self.s5(x)
-
+        
         for task in self.tasks:
             extra_head = getattr(self, "extra_heads_{}".format(task))
-            if task == 'tools' or task == 'actions':
-                out_features = extra_head(x, bboxes, features)
-                out[task].append(out_features)
-            else:
-                out[task].append(extra_head(x))
+                
+            out[task] = extra_head(inputs=x, bboxes=bboxes, features=features, boxes_mask=boxes_mask)
         
         return out
 
 @MODEL_REGISTRY.register()
 class MViT(nn.Module):
-    """
-    Multiscale Vision Transformers
-    Haoqi Fan, Bo Xiong, Karttikeya Mangalam, Yanghao Li, Zhicheng Yan, Jitendra Malik, Christoph Feichtenhofer
-    https://arxiv.org/abs/2104.11227
-    """
-
-    def __init__(self, cfg):
-        super().__init__()
-        # Get parameters.
-        assert cfg.DATA.TRAIN_CROP_SIZE == cfg.DATA.TEST_CROP_SIZE
-        self.cfg = cfg
-        
-        pool_first = cfg.MVIT.POOL_FIRST
-        # Prepare input.
-        spatial_size = cfg.DATA.TRAIN_CROP_SIZE
-        temporal_size = cfg.DATA.NUM_FRAMES
-        in_chans = cfg.DATA.INPUT_CHANNEL_NUM[0]
-        use_2d_patch = cfg.MVIT.PATCH_2D
-        self.patch_stride = cfg.MVIT.PATCH_STRIDE
-        if use_2d_patch:
-            self.patch_stride = [1] + self.patch_stride
-        
-        # Prepare PSI-AVA tasks
-        self.tasks = deepcopy(cfg.TASKS.TASKS)
-        self.num_classes = deepcopy(cfg.TASKS.NUM_CLASSES)
-        self.act_fun = deepcopy(cfg.TASKS.HEAD_ACT)
-        self.regions = cfg.REGIONS.ENABLE
-        self.recogn = cfg.TASKS.PRESENCE_RECOGNITION
-        if cfg.REGIONS.ENABLE:
-            self.features = cfg.FEATURES.ENABLE
-            self._region_tasks = {task for task in cfg.TASKS.TASKS if task in cfg.ENDOVIS_DATASET.REGION_TASKS}
-            self._frame_tasks = {task for task in cfg.TASKS.TASKS if task not in cfg.ENDOVIS_DATASET.REGION_TASKS}
-            if cfg.TASKS.PRESENCE_RECOGNITION:
-                self.recog_tasks = set(cfg.TASKS.PRESENCE_TASKS)
-            
-        # Prepare output.
-        embed_dim = cfg.MVIT.EMBED_DIM
-        # Prepare backbone
-        num_heads = cfg.MVIT.NUM_HEADS
-        mlp_ratio = cfg.MVIT.MLP_RATIO
-        qkv_bias = cfg.MVIT.QKV_BIAS
-        self.drop_rate = cfg.MVIT.DROPOUT_RATE
-        depth = cfg.MVIT.DEPTH
-        drop_path_rate = cfg.MVIT.DROPPATH_RATE
-        mode = cfg.MVIT.MODE
-        self.cls_embed_on = cfg.MVIT.CLS_EMBED_ON
-        self.sep_pos_embed = cfg.MVIT.SEP_POS_EMBED
-        if cfg.MVIT.NORM == "layernorm":
-            norm_layer = partial(nn.LayerNorm, eps=1e-6)
-        else:
-            raise NotImplementedError("Only supports layernorm.")
-        self.patch_embed = stem_helper.PatchEmbed(
-            dim_in=in_chans,
-            dim_out=embed_dim,
-            kernel=cfg.MVIT.PATCH_KERNEL,
-            stride=cfg.MVIT.PATCH_STRIDE,
-            padding=cfg.MVIT.PATCH_PADDING,
-            conv_2d=use_2d_patch,
-        )
-        # Following MocoV3, initializing with random patches stabilize optimization
-        if cfg.MVIT.FREEZE_PATCH:
-            self.patch_embed.requires_grad = False
-            
-        self.input_dims = [temporal_size, spatial_size, spatial_size]
-        assert self.input_dims[1] == self.input_dims[2]
-        self.patch_dims = [
-            self.input_dims[i] // self.patch_stride[i]
-            for i in range(len(self.input_dims))
-        ]
-        num_patches = math.prod(self.patch_dims)
-
-        dpr = [
-            x.item() for x in torch.linspace(0, drop_path_rate, depth)
-        ]  # stochastic depth decay rule
-
-        if self.cls_embed_on:
-            self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim))
-            pos_embed_dim = num_patches + 1
-        else:
-            pos_embed_dim = num_patches
-
-        if self.sep_pos_embed:
-            self.pos_embed_spatial = nn.Parameter(
-                torch.zeros(
-                    1, self.patch_dims[1] * self.patch_dims[2], embed_dim
-                )
-            )
-            self.pos_embed_temporal = nn.Parameter(
-                torch.zeros(1, self.patch_dims[0], embed_dim)
-            )
-            if self.cls_embed_on:
-                self.pos_embed_class = nn.Parameter(
-                    torch.zeros(1, 1, embed_dim)
-                )
-        else:
-            self.pos_embed = nn.Parameter(
-                torch.zeros(1, pos_embed_dim, embed_dim)
-            )
-
-        if self.drop_rate > 0.0:
-            self.pos_drop = nn.Dropout(p=self.drop_rate)
-
-        dim_mul, head_mul = torch.ones(depth + 1), torch.ones(depth + 1)
-        for i in range(len(cfg.MVIT.DIM_MUL)):
-            dim_mul[cfg.MVIT.DIM_MUL[i][0]] = cfg.MVIT.DIM_MUL[i][1]
-        for i in range(len(cfg.MVIT.HEAD_MUL)):
-            head_mul[cfg.MVIT.HEAD_MUL[i][0]] = cfg.MVIT.HEAD_MUL[i][1]
-
-        pool_q = [[] for i in range(cfg.MVIT.DEPTH)]
-        pool_kv = [[] for i in range(cfg.MVIT.DEPTH)]
-        stride_q = [[] for i in range(cfg.MVIT.DEPTH)]
-        stride_kv = [[] for i in range(cfg.MVIT.DEPTH)]
-
-        for i in range(len(cfg.MVIT.POOL_Q_STRIDE)):
-            stride_q[cfg.MVIT.POOL_Q_STRIDE[i][0]] = cfg.MVIT.POOL_Q_STRIDE[i][
-                1:
-            ]
-            if cfg.MVIT.POOL_KVQ_KERNEL is not None:
-                pool_q[cfg.MVIT.POOL_Q_STRIDE[i][0]] = cfg.MVIT.POOL_KVQ_KERNEL
-            else:
-                pool_q[cfg.MVIT.POOL_Q_STRIDE[i][0]] = [
-                    s + 1 if s > 1 else s for s in cfg.MVIT.POOL_Q_STRIDE[i][1:]
-                ]
-
-        # If POOL_KV_STRIDE_ADAPTIVE is not None, initialize POOL_KV_STRIDE.
-        if cfg.MVIT.POOL_KV_STRIDE_ADAPTIVE is not None:
-            _stride_kv = cfg.MVIT.POOL_KV_STRIDE_ADAPTIVE
-            cfg.MVIT.POOL_KV_STRIDE = []
-            for i in range(cfg.MVIT.DEPTH):
-                if len(stride_q[i]) > 0:
-                    _stride_kv = [
-                        max(_stride_kv[d] // stride_q[i][d], 1)
-                        for d in range(len(_stride_kv))
-                    ]
-                cfg.MVIT.POOL_KV_STRIDE.append([i] + _stride_kv)
-
-        for i in range(len(cfg.MVIT.POOL_KV_STRIDE)):
-            stride_kv[cfg.MVIT.POOL_KV_STRIDE[i][0]] = cfg.MVIT.POOL_KV_STRIDE[
-                i
-            ][1:]
-            if cfg.MVIT.POOL_KVQ_KERNEL is not None:
-                pool_kv[
-                    cfg.MVIT.POOL_KV_STRIDE[i][0]
-                ] = cfg.MVIT.POOL_KVQ_KERNEL
-            else:
-                pool_kv[cfg.MVIT.POOL_KV_STRIDE[i][0]] = [
-                    s + 1 if s > 1 else s
-                    for s in cfg.MVIT.POOL_KV_STRIDE[i][1:]
-                ]
-
-        self.norm_stem = norm_layer(embed_dim) if cfg.MVIT.NORM_STEM else None
-
-        self.blocks = nn.ModuleList()
-
-        if cfg.MODEL.ACT_CHECKPOINT:
-            validate_checkpoint_wrapper_import(checkpoint_wrapper)
-        for i in range(depth):
-            num_heads = round_width(num_heads, head_mul[i])
-            embed_dim = round_width(embed_dim, dim_mul[i], divisor=num_heads)
-            dim_out = round_width(
-                embed_dim,
-                dim_mul[i + 1],
-                divisor=round_width(num_heads, head_mul[i + 1]),
-            )
-            attention_block = MultiScaleBlock(
-                dim=embed_dim,
-                dim_out=dim_out,
-                num_heads=num_heads,
-                mlp_ratio=mlp_ratio,
-                qkv_bias=qkv_bias,
-                drop_rate=self.drop_rate,
-                drop_path=dpr[i],
-                norm_layer=norm_layer,
-                kernel_q=pool_q[i] if len(pool_q) > i else [],
-                kernel_kv=pool_kv[i] if len(pool_kv) > i else [],
-                stride_q=stride_q[i] if len(stride_q) > i else [],
-                stride_kv=stride_kv[i] if len(stride_kv) > i else [],
-                mode=mode,
-                has_cls_embed=self.cls_embed_on,
-                pool_first=pool_first,
-            )
-            if cfg.MODEL.ACT_CHECKPOINT:
-                attention_block = checkpoint_wrapper(attention_block)
-            self.blocks.append(attention_block)
-
-        self.embed_dim = dim_out
-        self.norm = norm_layer(self.embed_dim)
-        pool_size = _POOL1[cfg.MODEL.ARCH]
-        pool_size[0][0] = self.patch_stride[0]
-
-        for idx, task in enumerate(self.tasks):
-            if self.regions and task in self._region_tasks:
-                if self.features:
-                    extra_head = head_helper.TransformerRoIHead(
-                                cfg,
-                                num_classes=self.num_classes[idx],
-                                dropout_rate=cfg.MODEL.DROPOUT_RATE,
-                                act_func=self.act_fun[idx],
-                                cls_embed=self.cls_embed_on
-                                )
-                else:
-                    pass
-
-                if self.recogn and task in self.recog_tasks:
-                    recog_head = head_helper.TransformerBasicHead(
-                                    self.embed_dim,
-                                    self.num_classes[idx],
-                                    dropout_rate=cfg.MODEL.DROPOUT_RATE,
-                                    act_func='sigmoid',
-                                    cls_embed=False,
-                                    recognition=True
-                                )
-                    self.add_module("extra_heads_{}_presence".format(task), recog_head)
-            else:
-                extra_head = head_helper.TransformerBasicHead(
-                            self.embed_dim,
-                            self.num_classes[idx],
-                            dropout_rate=cfg.MODEL.DROPOUT_RATE,
-                            act_func=self.act_fun[idx],
-                            cls_embed=self.cls_embed_on,
-                            recognition=False
-                        )
-            
-
-            self.add_module("extra_heads_{}".format(task), extra_head)
-   
-        if self.sep_pos_embed:
-            trunc_normal_(self.pos_embed_spatial, std=0.02)
-            trunc_normal_(self.pos_embed_temporal, std=0.02)
-            if self.cls_embed_on:
-                trunc_normal_(self.pos_embed_class, std=0.02)
-        else:
-            trunc_normal_(self.pos_embed, std=0.02)
-        if self.cls_embed_on:
-            trunc_normal_(self.cls_token, std=0.02)
-        self.apply(self._init_weights)
-
-    def _init_weights(self, m):
-        if isinstance(m, nn.Linear):
-            nn.init.trunc_normal_(m.weight, std=0.02)
-            if isinstance(m, nn.Linear) and m.bias is not None:
-                nn.init.constant_(m.bias, 0)
-        elif isinstance(m, nn.LayerNorm):
-            nn.init.constant_(m.bias, 0)
-            nn.init.constant_(m.weight, 1.0)
-
-    @torch.jit.ignore
-    def no_weight_decay(self):
-        if self.cfg.MVIT.ZERO_DECAY_POS_CLS:
-            if self.sep_pos_embed:
-                if self.cls_embed_on:
-                    return {
-                        "pos_embed_spatial",
-                        "pos_embed_temporal",
-                        "pos_embed_class",
-                        "cls_token",
-                    }
-                else:
-                    return {
-                        "pos_embed_spatial",
-                        "pos_embed_temporal",
-                        "pos_embed_class",
-                    }
-            else:
-                if self.cls_embed_on:
-                    return {"pos_embed", "cls_token"}
-                else:
-                    return {"pos_embed"}
-        else:
-            return {}
-
-    def forward(self, x, features=None, boxes_mask=None):
-        # breakpoint()
-        out = {}
-        x = x[0]
-        x = self.patch_embed(x)
-
-        T = self.cfg.DATA.NUM_FRAMES // self.patch_stride[0]
-        H = self.cfg.DATA.TRAIN_CROP_SIZE // self.patch_stride[1]
-        W = self.cfg.DATA.TRAIN_CROP_SIZE // self.patch_stride[2]
-        B, N, C = x.shape
-
-        if self.cls_embed_on:
-            cls_tokens = self.cls_token.expand(
-                B, -1, -1
-            )  # stole cls_tokens impl from Phil Wang, thanks
-            x = torch.cat((cls_tokens, x), dim=1)
-
-        if self.sep_pos_embed:
-            pos_embed = self.pos_embed_spatial.repeat(
-                1, self.patch_dims[0], 1
-            ) + torch.repeat_interleave(
-                self.pos_embed_temporal,
-                self.patch_dims[1] * self.patch_dims[2],
-                dim=1,
-            )
-            if self.cls_embed_on:
-                pos_embed = torch.cat([self.pos_embed_class, pos_embed], 1)
-            x = x + pos_embed
-        else:
-            x = x + self.pos_embed
-
-        if self.drop_rate:
-            x = self.pos_drop(x)
-
-        if self.norm_stem:
-            x = self.norm_stem(x)
-
-        thw = [T, H, W]
-        for blk in self.blocks:
-            x, thw = blk(x, thw)
-
-        x = self.norm(x)
-
-        # TAPIR head classification
-        for task in self.tasks:
-            extra_head = getattr(self, "extra_heads_{}".format(task))
-            out[task] = extra_head(x, features, boxes_mask)
-
-            if self.recogn and task in self.recog_tasks:
-                out[f'{task}_presence'] = getattr(self, "extra_heads_{}_presence".format(task))(x, features, boxes_mask)
-                
-        return out
-
-@MODEL_REGISTRY.register()
-class MViTv2(nn.Module):
     """
     Model builder for MViTv1 and MViTv2.
     "MViTv2: Improved Multiscale Vision Transformers for Classification and Detection"
@@ -791,6 +461,7 @@ class MViTv2(nn.Module):
         pool_first = cfg.MVIT.POOL_FIRST
         # Prepare input.
         spatial_size = cfg.DATA.TRAIN_CROP_SIZE
+        spatial_size_large = cfg.DATA.TRAIN_CROP_SIZE_LARGE
         temporal_size = cfg.DATA.NUM_FRAMES
         in_chans = cfg.DATA.INPUT_CHANNEL_NUM[0]
         self.use_2d_patch = cfg.MVIT.PATCH_2D
@@ -799,21 +470,40 @@ class MViTv2(nn.Module):
         if self.use_2d_patch:
             self.patch_stride = [1] + self.patch_stride
         
-        # Prepare PSI-AVA tasks
-        self.tasks = cfg.TASKS.TASKS
-        self.num_classes = cfg.TASKS.NUM_CLASSES
-        self.act_fun = cfg.TASKS.HEAD_ACT
+        # Prepare GraSP tasks
+        self.tasks = deepcopy(cfg.TASKS.TASKS)
+        self.num_classes = deepcopy(cfg.TASKS.NUM_CLASSES)
+        self.act_fun = deepcopy(cfg.TASKS.HEAD_ACT)
         self.regions = cfg.REGIONS.ENABLE
+        self.use_rpn = cfg.FEATURES.USE_RPN
+        self.precalc_test = cfg.FEATURES.PRECALCULATE_TEST
+        self.recogn = cfg.TASKS.PRESENCE_RECOGNITION
+        self._frame_tasks = {task for task in cfg.TASKS.TASKS if task not in cfg.ENDOVIS_DATASET.REGION_TASKS}
+
         if cfg.REGIONS.ENABLE:
             self.features = cfg.FEATURES.ENABLE
             self._region_tasks = {task for task in cfg.TASKS.TASKS if task in cfg.ENDOVIS_DATASET.REGION_TASKS}
-            self._frame_tasks = {task for task in cfg.TASKS.TASKS if task not in cfg.ENDOVIS_DATASET.REGION_TASKS}
+            if cfg.TASKS.PRESENCE_RECOGNITION:
+                self.recog_tasks = set(cfg.TASKS.PRESENCE_TASKS)
+        
+            if cfg.FEATURES.USE_RPN:
+                from .region_proposals import RegionProposal
+                self.rpn = RegionProposal(cfg.FEATURES.RPN_CFG, 
+                                          (cfg.DATA.TRAIN_CROP_SIZE,
+                                           cfg.DATA.TRAIN_CROP_SIZE_LARGE),
+                                           not self.precalc_test,
+                )
+                # Freeze the parameters of the secondary model
+                for param in self.rpn.parameters():
+                    param.requires_grad = False
+
+                self.rpn.eval()
+                self.rpn.train = lambda mode=False: self.rpn
 
         self.T = cfg.DATA.NUM_FRAMES // self.patch_stride[0]
         self.H = cfg.DATA.TRAIN_CROP_SIZE // self.patch_stride[1]
-        self.W = cfg.DATA.TRAIN_CROP_SIZE // self.patch_stride[2]
+        self.W = cfg.DATA.TRAIN_CROP_SIZE_LARGE // self.patch_stride[2]
         # Prepare output.
-        num_classes = cfg.MODEL.NUM_CLASSES
         embed_dim = cfg.MVIT.EMBED_DIM
         # Prepare backbone
         num_heads = cfg.MVIT.NUM_HEADS
@@ -824,17 +514,20 @@ class MViTv2(nn.Module):
         drop_path_rate = cfg.MVIT.DROPPATH_RATE
         mode = cfg.MVIT.MODE
         self.cls_embed_on = cfg.MVIT.CLS_EMBED_ON
+        
+        self.multiple_cls_embeds = self.cls_embed_on and cfg.TASKS.MULTIPLE_CLS
         # Params for positional embedding
         self.use_abs_pos = cfg.MVIT.USE_ABS_POS
         self.use_fixed_sincos_pos = cfg.MVIT.USE_FIXED_SINCOS_POS
         self.sep_pos_embed = cfg.MVIT.SEP_POS_EMBED
         self.rel_pos_spatial = cfg.MVIT.REL_POS_SPATIAL
         self.rel_pos_temporal = cfg.MVIT.REL_POS_TEMPORAL
+        self.use_temp_embed = cfg.DATA.NUM_FRAMES > 1
         if cfg.MVIT.NORM == "layernorm":
             norm_layer = partial(nn.LayerNorm, eps=1e-6)
         else:
             raise NotImplementedError("Only supports layernorm.")
-        self.patch_embed = stem_helperv2.PatchEmbed(
+        self.patch_embed = stem_helper.PatchEmbed(
             dim_in=in_chans,
             dim_out=embed_dim,
             kernel=cfg.MVIT.PATCH_KERNEL,
@@ -845,8 +538,8 @@ class MViTv2(nn.Module):
 
         if cfg.MODEL.ACT_CHECKPOINT:
             self.patch_embed = checkpoint_wrapper(self.patch_embed)
-        self.input_dims = [temporal_size, spatial_size, spatial_size]
-        assert self.input_dims[1] == self.input_dims[2]
+        self.input_dims = [temporal_size, spatial_size, spatial_size_large]
+        # assert self.input_dims[1] == self.input_dims[2]
         self.patch_dims = [
             self.input_dims[i] // self.patch_stride[i]
             for i in range(len(self.input_dims))
@@ -858,8 +551,8 @@ class MViTv2(nn.Module):
         ]  # stochastic depth decay rule
 
         if self.cls_embed_on:
-            self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim))
-            pos_embed_dim = num_patches + 1
+            self.cls_token = nn.Parameter(torch.zeros(1, 1 if not self.multiple_cls_embeds else len(self._frame_tasks), embed_dim))
+            pos_embed_dim = num_patches + (1 if not self.multiple_cls_embeds else len(self._frame_tasks))
         else:
             pos_embed_dim = num_patches
 
@@ -870,12 +563,14 @@ class MViTv2(nn.Module):
                         1, self.patch_dims[1] * self.patch_dims[2], embed_dim
                     )
                 )
-                self.pos_embed_temporal = nn.Parameter(
-                    torch.zeros(1, self.patch_dims[0], embed_dim)
-                )
+                
+                if self.use_temp_embed:
+                    self.pos_embed_temporal = nn.Parameter(
+                        torch.zeros(1, self.patch_dims[0], embed_dim)
+                    )
                 if self.cls_embed_on:
                     self.pos_embed_class = nn.Parameter(
-                        torch.zeros(1, 1, embed_dim)
+                        torch.zeros(1, 1 if not self.multiple_cls_embeds else len(self._frame_tasks), embed_dim)
                     )
             else:
                 self.pos_embed = nn.Parameter(
@@ -962,7 +657,7 @@ class MViTv2(nn.Module):
                     dim_mul[i + 1],
                     divisor=round_width(num_heads, head_mul[i + 1]),
                 )
-            attention_block = MultiScaleBlockv2(
+            attention_block = MultiScaleBlock(
                 dim=embed_dim,
                 dim_out=dim_out,
                 num_heads=num_heads,
@@ -978,6 +673,7 @@ class MViTv2(nn.Module):
                 stride_kv=stride_kv[i] if len(stride_kv) > i else [],
                 mode=mode,
                 has_cls_embed=self.cls_embed_on,
+                multiple_cls=1 if not self.multiple_cls_embeds else len(self._frame_tasks),
                 pool_first=pool_first,
                 rel_pos_spatial=self.rel_pos_spatial,
                 rel_pos_temporal=self.rel_pos_temporal,
@@ -1012,20 +708,34 @@ class MViTv2(nn.Module):
                                 )
                 else:
                     pass
+
+                if self.recogn and task in self.recog_tasks:
+                    recog_head = head_helper.TransformerBasicHead(
+                                    embed_dim,
+                                    self.num_classes[idx],
+                                    dropout_rate=cfg.MODEL.DROPOUT_RATE,
+                                    act_func='sigmoid',
+                                    cls_embed=False,
+                                    recognition=True
+                                )
+                    self.add_module("extra_heads_{}_presence".format(task), recog_head)
             else:
                 extra_head = head_helper.TransformerBasicHead(
-                            self.embed_dim,
+                            embed_dim,
                             self.num_classes[idx],
                             dropout_rate=cfg.MODEL.DROPOUT_RATE,
                             act_func=self.act_fun[idx],
-                            cls_embed=self.cls_embed_on
+                            cls_embed=self.cls_embed_on,
+                            recognition=False
                         )
+                
             self.add_module("extra_heads_{}".format(task), extra_head)
 
         if self.use_abs_pos:
             if self.sep_pos_embed:
                 trunc_normal_(self.pos_embed_spatial, std=0.02)
-                trunc_normal_(self.pos_embed_temporal, std=0.02)
+                if self.use_temp_embed:
+                    trunc_normal_(self.pos_embed_temporal, std=0.02)
                 if self.cls_embed_on:
                     trunc_normal_(self.pos_embed_class, std=0.02)
             else:
@@ -1087,8 +797,8 @@ class MViTv2(nn.Module):
         else:
             t, h, w = bcthw[-3], bcthw[-2], bcthw[-1]
         if self.cls_embed_on:
-            cls_pos_embed = pos_embed[:, 0:1, :]
-            pos_embed = pos_embed[:, 1:]
+            cls_pos_embed = pos_embed[:, 0:(1 if not self.multiple_cls_embeds else len(self._frame_tasks)), :]
+            pos_embed = pos_embed[:, (1 if not self.multiple_cls_embeds else len(self._frame_tasks)):]
         txy_num = pos_embed.shape[1]
         p_t, p_h, p_w = self.patch_dims
         assert p_t * p_h * p_w == txy_num
@@ -1108,9 +818,23 @@ class MViTv2(nn.Module):
 
         return pos_embed
 
-    def forward(self, x, features=None, boxes_mask=False):
+    def forward(self, x, features=None, boxes_mask=False, images=None, bboxes=None,):
         out = {}
+
+        if (features is None or self.training or not self.precalc_test) \
+            and self.regions \
+            and self.use_rpn \
+            and images is not None:
+
+            features, boxes, masks = self.rpn(images, bboxes, boxes_mask, self.training)
+
+            if (not self.training) and masks is not None:
+                out['masks'] = masks
+                out['boxes'] = boxes
+        
         x = x[0]
+        if not self.use_temp_embed:
+            x = x.squeeze(2)
         x, bcthw = self.patch_embed(x)
         bcthw = list(bcthw)
         if len(bcthw) == 4:  # Fix bcthw in case of 4D tensor
@@ -1135,11 +859,14 @@ class MViTv2(nn.Module):
             if self.sep_pos_embed:
                 pos_embed = self.pos_embed_spatial.repeat(
                     1, self.patch_dims[0], 1
-                ) + torch.repeat_interleave(
-                    self.pos_embed_temporal,
-                    self.patch_dims[1] * self.patch_dims[2],
-                    dim=1,
-                )
+                ) 
+                
+                if self.use_temp_embed:
+                    pos_embed += torch.repeat_interleave(
+                        self.pos_embed_temporal,
+                        self.patch_dims[1] * self.patch_dims[2],
+                        dim=1,
+                    )
                 if self.cls_embed_on:
                     pos_embed = torch.cat([self.pos_embed_class, pos_embed], 1)
                 x += self._get_pos_embed(pos_embed, bcthw)
@@ -1159,9 +886,17 @@ class MViTv2(nn.Module):
         
         x = self.norm(x)
 
-        # TAPIR head classification
+        # TAPIS head classification
         for task in self.tasks:
             extra_head = getattr(self, "extra_heads_{}".format(task))
-            out[task] = extra_head(x, features, boxes_mask, self.cls_embed_on)
+            if task in self._frame_tasks and self.multiple_cls_embeds:
+                cls_idx = list(self._frame_tasks).index(task)
+            else:
+                cls_idx = 0
+                
+            out[task] = extra_head(inputs=x, cls_idx=cls_idx, features=features, boxes_mask=boxes_mask)
+
+            if self.recogn and task in self.recog_tasks:
+                out[f'{task}_presence'] = getattr(self, "extra_heads_{}_presence".format(task))(x=x, features=features, boxes_mask=boxes_mask)
                 
         return out

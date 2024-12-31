@@ -69,6 +69,17 @@ def register_surgical_dataset(cfg):
             image_root = os.path.join(dataset_path, 'frames')
             register_coco_instances(f'grasp_{split}', metadata, json_file, image_root)
     
+    # Register GraSP Generic
+    elif dataset_name == 'grasp-generic':
+        cats_data = sorted(json.load(open(os.path.join(dataset_path, 'annotations', 'grasp_short-term_generic_fold1_polygon.json')))['categories'], key = lambda x: x['id'])
+        metadata = {'thing_dataset_id_to_contiguous_id': {cat['id']:c_id for c_id,cat in enumerate(cats_data)},
+                    'thing_classes': [cat['name'] for cat in cats_data],}
+        
+        for split in ['fold1','fold2']:
+            json_file = os.path.join(dataset_path, 'annotations', f'grasp_short-term_generic_{split}_polygon.json')
+            image_root = os.path.join(dataset_path, 'frames')
+            register_coco_instances(f'grasp-generic_{split}', metadata, json_file, image_root)
+    
     # Register Endovis 2017
     elif dataset_name == 'endovis-2017':
         cats_data = sorted(json.load(open(os.path.join(dataset_path, 'annotations', 'Fold0', 'train.json')))['categories'], key = lambda x: x['id'])

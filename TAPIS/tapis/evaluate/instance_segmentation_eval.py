@@ -13,7 +13,7 @@ from .ava_evaluation import (
 )
 from .utils import xywhbbox_to_dxdydxdybbox as normalize_bbox
 
-def eval_segmentation(task, coco_anns, preds, img_ann_dict, mask_path):
+def eval_segmentation(task, coco_anns, preds, img_ann_dict, **kwargs):
     # Transform data to pascal format
     if 'instruments_categories' in coco_anns:
         categories = coco_anns['instruments_categories']

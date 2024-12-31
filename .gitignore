@@ -2,3 +2,5 @@ TAPIS/outputs
 TAPIS/data/GraSP
 TAPIS/region_proposals/output
 */__pycache__
+*.pyth
+*.pth

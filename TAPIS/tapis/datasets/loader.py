@@ -40,6 +40,8 @@ def detection_collate(batch):
             data = list(itertools.chain(*data))
             collated_extra_data[key] = torch.tensor(data).float()
             collated_extra_data["ori_boxes_idxs"] = torch.tensor(idxs)
+        elif key == "images":
+            collated_extra_data[key] = torch.nested.nested_tensor(data).float()
         else:
             collated_extra_data[key] = default_collate(data).float()
     
@@ -47,12 +49,13 @@ def detection_collate(batch):
     for key in all_labels[0]:
         data = [d[key] for d in all_labels]
 
-        #TODO: REMOVE when all done
+        #TODO: These are just security checks, REMOVE when all done
         assert all(type(data[0]) == type(d) for d in data), f'Inconsistent data type {data}'
+        
         if isinstance(data[0],list):
             data = list(itertools.chain(*data))
         else:
-            #TODO: REMOVE when all done
+            #TODO: These are just security checks, REMOVE when all done
             assert isinstance(data[0],int) or isinstance(data[0],np.ndarray), f'Type {type(data[0])} not supported'
             
         collated_labels[key] = torch.tensor(data).float()
@@ -76,7 +79,7 @@ def construct_loader(cfg, split, is_precise_bn=False):
         shuffle = True
         drop_last = True
     elif split in ["val"]:
-        dataset_name = cfg.TRAIN.DATASET
+        dataset_name = cfg.TEST.DATASET
         batch_size = int(cfg.TEST.BATCH_SIZE / max(1, cfg.NUM_GPUS))
         shuffle = False
         drop_last = False

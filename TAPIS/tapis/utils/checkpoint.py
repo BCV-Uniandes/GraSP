@@ -225,6 +225,7 @@ def load_checkpoint(
     epoch_reset=False,
     clear_name_pattern=(),
     scheduler=None,
+    rpn_checkpoint="",
 ):
     """
     Load the checkpoint from the given file. If inflation is True, inflate the
@@ -319,12 +320,27 @@ def load_checkpoint(
         diff = {d for d in diff if "num_batches_tracked" not in d}
         if len(diff) > 0:
             logger.warn("Not loaded {}".format(diff))
+        
+        if len(rpn_checkpoint):
+            rpn = torch.load(rpn_checkpoint, map_location="cpu")
+            if model in rpn:
+                rpn = rpn['model']
+            for k,v in rpn.items():
+                state_dict[f'rpn.rpn.{k}'] = v
         ms.load_state_dict(state_dict, strict=False)
         epoch = -1
     else:
         # Load the checkpoint on CPU to avoid GPU mem spike.
         with pathmgr.open(path_to_checkpoint, "rb") as f:
             checkpoint = torch.load(f, map_location="cpu")
+        
+        if len(rpn_checkpoint):
+            rpn = torch.load(rpn_checkpoint, map_location="cpu")
+            if model in rpn:
+                rpn = rpn['model']
+            for k,v in rpn.items():
+                checkpoint['model_state'][f'rpn.rpn.{k}'] = v
+            
         model_state_dict_3d = (
             model.module.state_dict() if data_parallel else model.state_dict()
         )
@@ -367,13 +383,15 @@ def load_checkpoint(
                 k
                 for k in model_dict.keys()
                 if k not in pre_train_dict_match.keys()
-            ]
+            ] + [k for k in pre_train_dict_match.keys()
+                 if k not in model_dict]
             # Log weights that are not loaded with the pre-trained weights.
             if not_load_layers:
                 for k in not_load_layers:
                     logger.info("Network weights {} not loaded.".format(k))
             # Load pre-trained weights.
             ms.load_state_dict(pre_train_dict_match, strict=False)
+
             epoch = -1
 
             # Load the optimizer state (commonly not done when fine-tuning)
@@ -561,6 +579,7 @@ def load_train_checkpoint(cfg, model, optimizer, scaler=None):
             convert_from_caffe2=cfg.TRAIN.CHECKPOINT_TYPE == "caffe2",
             epoch_reset=cfg.TRAIN.CHECKPOINT_EPOCH_RESET,
             clear_name_pattern=cfg.TRAIN.CHECKPOINT_CLEAR_NAME_PATTERN,
+            rpn_checkpoint=cfg.FEATURES.RPN_CHECKPOINT if cfg.FEATURES.USE_RPN else "",
         )
         start_epoch = checkpoint_epoch + 1
     else:

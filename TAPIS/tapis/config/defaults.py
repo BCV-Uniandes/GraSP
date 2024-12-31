@@ -118,6 +118,49 @@ _C.AUG.RE_COUNT = 1
 # Do not random erase first (clean) augmentation split.
 _C.AUG.RE_SPLIT = False
 
+# ---------------------------------------------------------------------------- #
+# Multigrid training options
+# See https://arxiv.org/abs/1912.00998 for details about multigrid training.
+# ---------------------------------------------------------------------------- #
+_C.MULTIGRID = CfgNode()
+
+# Multigrid training allows us to train for more epochs with fewer iterations.
+# This hyperparameter specifies how many times more epochs to train.
+# The default setting in paper trains for 1.5x more epochs than baseline.
+_C.MULTIGRID.EPOCH_FACTOR = 1.5
+
+# Enable short cycles.
+_C.MULTIGRID.SHORT_CYCLE = False
+# Short cycle additional spatial dimensions relative to the default crop size.
+_C.MULTIGRID.SHORT_CYCLE_FACTORS = [0.5, 0.5**0.5]
+
+_C.MULTIGRID.LONG_CYCLE = False
+# (Temporal, Spatial) dimensions relative to the default shape.
+_C.MULTIGRID.LONG_CYCLE_FACTORS = [
+    (0.25, 0.5**0.5),
+    (0.5, 0.5**0.5),
+    (0.5, 1),
+    (1, 1),
+]
+
+# While a standard BN computes stats across all examples in a GPU,
+# for multigrid training we fix the number of clips to compute BN stats on.
+# See https://arxiv.org/abs/1912.00998 for details.
+_C.MULTIGRID.BN_BASE_SIZE = 8
+
+# Multigrid training epochs are not proportional to actual training time or
+# computations, so _C.TRAIN.EVAL_PERIOD leads to too frequent or rare
+# evaluation. We use a multigrid-specific rule to determine when to evaluate:
+# This hyperparameter defines how many times to evaluate a model per long
+# cycle shape.
+_C.MULTIGRID.EVAL_FREQ = 3
+
+# No need to specify; Set automatically and used as global variables.
+_C.MULTIGRID.LONG_CYCLE_SAMPLING_RATE = 0
+_C.MULTIGRID.DEFAULT_B = 0
+_C.MULTIGRID.DEFAULT_T = 0
+_C.MULTIGRID.DEFAULT_S = 0
+
 
 # ---------------------------------------------------------------------------- #
 # Testing options
@@ -233,7 +276,7 @@ _C.MODEL.NUM_CLASSES = 400
 _C.MODEL.LOSS_FUNC = "cross_entropy"
 
 # Model architectures that has one single pathway.
-_C.MODEL.SINGLE_PATHWAY_ARCH = ["2d", "c2d", "i3d", "slow", "x3d", "mvit", "mvitv2", "videoswintransformer"]
+_C.MODEL.SINGLE_PATHWAY_ARCH = ["2d", "c2d", "i3d", "slow", "x3d", "mvit", "mvitv2", "videoswintransformer", "transformerroihead"]
 
 # Model architectures that has multiple pathways.
 _C.MODEL.MULTI_PATHWAY_ARCH = ["slowfast"]
@@ -415,59 +458,72 @@ _C.MVIT.RESIDUAL_POOLING = False
 # If True, using separate linear layers for Q, K, V in attention blocks.
 _C.MVIT.SEPARATE_QKV = False
 
+
 # -----------------------------------------------------------------------------
-# Video Swin Transformers options
+# Video Swin Transformer (VST) Configuration Options
 # -----------------------------------------------------------------------------
-# TODO DOCUMENT VST.
+
+# Initialize a configuration node for Video Swin Transformers
 _C.VST = CfgNode()
 
-# Load checkpoint from Video Swin Transformers
+# Indicates whether to load a pre-trained checkpoint for Video Swin Transformer
 _C.VST.PRETRAINED = False
+
+# Specifies if the model uses a 2D pre-trained checkpoint
 _C.VST.PRETRAINED2D = False
 
-#
+# Defines the number of transformer layers in each stage
+# Default: [2, 2, 18, 2] corresponding to a hierarchical architecture
 _C.VST.DEPTHS = [2, 2, 18, 2]
 
-#
+# Dimension of the embedding (hidden size) for each transformer layer
 _C.VST.EMBED_DIM = 128
 
-#
+# Enables or disables normalization after patch embedding
 _C.VST.PATCH_NORM = True
 
-#
+# Number of stages to freeze during training; -1 means no freezing
 _C.VST.FROZEN_STAGES = -1
 
-#
-_C.VST.WINDOW_SIZE = (8,7,7)
+# Specifies the window size for self-attention in the temporal (depth) and spatial dimensions
+# Default: (8, 7, 7) where 8 is temporal, and 7x7 is spatial
+_C.VST.WINDOW_SIZE = (8, 7, 7)
 
-#
-_C.VST.PATCH_SIZE = (4,4,4)
+# Size of each patch extracted from the input video
+# Default: (4, 4, 4) for 4 frames, 4x4 spatial resolution per patch
+_C.VST.PATCH_SIZE = (4, 4, 4)
 
-#
+# Number of attention heads for each stage of the model
+# Default: [4, 8, 16, 32] corresponding to the stages in _C.VST.DEPTHS
 _C.VST.NUM_HEADS = [4, 8, 16, 32]
 
-#
+# Dropout rate for fully connected layers
+# Default: 0.0 (no dropout)
 _C.VST.DROP_RATE = 0.
 
-#
+# Enables gradient checkpointing to save memory at the cost of computation
 _C.VST.USE_CHECKPOINT = False
 
-#
+# Ratio of hidden layer size to embedding size in the MLP layer
+# Default: 4.0
 _C.VST.MLP_RATIO = 4.0
 
-#
+# Adds a bias term to the query, key, and value projections in self-attention
 _C.VST.QKV_BIAS = True
 
-#
+# Overrides the scaling factor for query-key dot products; default is computed dynamically
 _C.VST.QK_SCALE = None
 
-#
+# Dropout rate for attention probabilities in the multi-head attention mechanism
+# Default: 0.0 (no dropout)
 _C.VST.ATTN_DROP_RATE = 0.
 
 # Number of channels in the input video frames
+# Default: 3 for RGB input
 _C.VST.IN_CHANS = 3
 
-# 
+# Drop path rate for stochastic depth, which randomly drops entire paths in the model
+# Default: 0.2 for regularization
 _C.VST.DROP_PATH_RATE = 0.2
 
 
@@ -556,8 +612,14 @@ _C.DATA.TRAIN_JITTER_MOTION_SHIFT = False
 # The spatial crop size for training.
 _C.DATA.TRAIN_CROP_SIZE = 224
 
+# The spatial crop size for training.
+_C.DATA.TRAIN_CROP_SIZE_LARGE = 224
+
 # The spatial crop size for testing.
-_C.DATA.TEST_CROP_SIZE = 256
+_C.DATA.TEST_CROP_SIZE = 224
+
+# The spatial crop size for testing.
+_C.DATA.TEST_CROP_SIZE_LARGE = 224
 
 # Input videos may has different fps, convert it to the target video fps before
 # frame sampling.
@@ -802,7 +864,13 @@ _C.ENDOVIS_DATASET.REGION_TASKS = ["instruments", "actions"]
 _C.ENDOVIS_DATASET.INCLUDE_GT = True
 
 # Use Predicted Boxes
-_C.ENDOVIS_DATASET.USE_PREDS = True
+_C.ENDOVIS_DATASET.USE_PREDS = False
+
+# Path to semantic segmentation masks
+_C.ENDOVIS_DATASET.MASKS_PATH = ""
+
+# Aspect ratio threshold for difference between original image and cropped image when using RPN
+_C.ENDOVIS_DATASET.ASPECT_RATION_TH = 0.02
 
 # -----------------------------------------------------------------------------
 # Classification heads options
@@ -842,6 +910,12 @@ _C.TASKS.PRESENCE_WEIGHTS = [1]
 # Tasks to supervise presence.
 _C.TASKS.EVAL_PRESENCE = False
 
+# Use a cls token for each frame level task
+_C.TASKS.MULTIPLE_CLS = False
+
+# Use videofeature extractor or not
+_C.TASKS.USE_VIDEO = True
+
 # ---------------------------------------------------------------------------- #
 # FEATURES
 # ---------------------------------------------------------------------------- #
@@ -861,6 +935,21 @@ _C.FEATURES.TRAIN_FEATURES_PATH = ''
 
 # Path to .pth file with the detected validation boxes features
 _C.FEATURES.TEST_FEATURES_PATH = ''
+
+# Use a Region Proposal Network to calculate region features on the fly instead of loading precalculated featrues
+_C.FEATURES.USE_RPN = False
+
+# Configs for the Region Proposal Network
+_C.FEATURES.RPN_CFG = CfgNode()
+
+# Path to config.yaml file for the Region Proposal Network
+_C.FEATURES.RPN_CFG_PATH = ''
+
+# Use a precaulculated regions for test instead of RPN
+_C.FEATURES.PRECALCULATE_TEST = True
+
+# Path to Mask2Former pretrained weights
+_C.FEATURES.RPN_CHECKPOINT = ""
 
 # Add custom config with default values.
 custom_config.add_custom_config(_C)

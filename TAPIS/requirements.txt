@@ -7,3 +7,7 @@ pandas
 Pillow
 scikit-learn
 scikit-image
+av
+iopath
+opencv-python
+pycocotools

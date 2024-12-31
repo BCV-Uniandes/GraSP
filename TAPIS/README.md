@@ -20,30 +20,28 @@ Please follow these steps to run TAPIS:
 ```sh
 $ conda create --name tapis python=3.8 -y
 $ conda activate tapis
-$ conda install pytorch==1.9.0 torchvision==0.10.0 cudatoolkit=11.1 -c pytorch -c nvidia
+$ conda install pytorch==2.4.1 torchvision==0.19.1 pytorch-cuda=12.4 -c pytorch -c nvidia
 
-$ conda install av -c conda-forge
-$ pip install -U iopath
-$ pip install -U opencv-python
-$ pip install -U pycocotools
-$ pip install 'git+https://github.com/facebookresearch/fvcore'
-$ pip install 'git+https://github.com/facebookresearch/fairscale'
-$ python -m pip install 'git+https://github.com/facebookresearch/detectron2.git'
+# (for older cuda versions)
+# conda install pytorch==1.9.0 torchvision==0.10.0 cudatoolkit=11.1 -c pytorch -c nvidia
 
 $ git clone https://github.com/BCV-Uniandes/GraSP
 $ cd GraSP/TAPIS
 $ pip install -r requirements.txt
+
+$ pip install 'git+https://github.com/facebookresearch/fvcore'
+$ pip install 'git+https://github.com/facebookresearch/fairscale'
+$ python -m pip install 'git+https://github.com/facebookresearch/detectron2.git'
 ```
 
 ## Data Preparation
 
-In this [link](http://157.253.243.19/TAPIS/TAPIS.tar.gz), you will find a compressed archive with our preprocessed data files, region proposals, and pre-trained models. We provide a README file with instructions about the data structures and the files in the link. Download and uncompress these files with the following command.
+In this [Google Drive Link](https://drive.google.com/file/d/1qFUwzmT0c14GE73VEK15saI2AHnszxgB/view?usp=sharing), you will find a compressed archive with our preprocessed data files, region proposals, and pre-trained models. We provide a README file with instructions about the data structures and the files in the link. Download this file and uncompress it with the following command.
 
 ```sh
-$ wget http://157.253.243.19/TAPIS/TAPIS.tar.gz
 $ tar -xzvf TAPIS.tar.gz
 ```
-Then, locate the extracted files in a directory named GraSP inside the data directory of this repository. Please also include the video frames. In the end, the repository must have the following structure.
+Then, locate the extracted files in a directory named GraSP inside the data directory of this repository. Please also include the video frames in a directory named "frames", and include the original annotations in the "annotations" directory next to the region predictions. In the end, the repository must have the following structure.
 
 ```tree
 TAPIS
@@ -53,26 +51,28 @@ TAPIS
 |__data
 |   |__GraSP
 |       |__annotations
-|       |   |__fold1
-|       |   |   |__train_anns.json
-|       |   |   |__train_preds.json
-|       |   |   |__train_long-term_anns.json
-|       |   |   |__fold2_anns.json
-|       |   |   |__fold2_preds.json
-|       |   |   |__fold2_long-term_anns.json
-|       |   |__fold2
-|       |   |   ...
-|       |   |__train
-|       |       ...
+|       |   |__fold1_train_preds.json
+|       |   |__fold1_val_preds.json
+|       |   |__fold2_train_preds.json
+|       |   |__fold2_val_preds.json
+|       |   |__train_train_preds.json
+|       |   |__test_val_preds.json
+|       |   |__grasp_long-term_fold1.json
+|       |   |__grasp_long-term_fold2.json
+|       |   |__grasp_long-term_train.json
+|       |   |__grasp_long-term_test.json
+|       |   |__grasp_short-term_fold1.json
+|       |   |__grasp_short-term_fold2.json
+|       |   |__grasp_short-term_train.json
+|       |   |__grasp_short-term_test.json
 |       |
 |       |__features
-|       |   |__fold1
-|       |   |   |__train_region_features.pth
-|       |   |   |__fold2_preds_region_features.pth
-|       |   |__fold2
-|       |   |   ...
-|       |   |__train
-|       |       ...
+|       |   |__fold1_train_region_features.pth
+|       |   |__fold1_val_region_features.pth
+|       |   |__fold2_train_region_features.pth
+|       |   |__fold2_val_region_features.pth
+|       |   |__train_train_region_features.pth
+|       |   |__test_val_region_features.pth
 |       |
 |       |__frame_lists
 |       |   |__fold1.csv
@@ -90,18 +90,24 @@ TAPIS
 |       |   ...
 |       |
 |       |__pretrained_models
-|           |__ACTIONS
-|           |   |__actions_m2f-swinl_fold1.pyth
-|           |   |__actions_m2f-swinl_fold2.pyth
-|           |   |__actions_m2f-swinl_train.pyth
-|           |__INSTRUMENTS
+|           |__fold1
+|           |   |__ACTIONS.pyth
+|           |   |__LONG.pyth
+|           |   |__PHASES.pyth
+|           |   |__STEPS.pyth
+|           |   |__INSTRUMENTS.pyth
+|           |   |__SEGMENTATION_BASELINE
+|           |       |__r50.pth
+|           |       |__swinl.pth
+|           |__fold2
 |           |   ...
-|           |__PHASES
-|           |   ...
-|           |__STEPS
-|           |   ...
-|           |__SEGMENTATION_BASELINE
-|               ...
+|           |__train
+|               |__ACTIONS.pyth
+|               |__LONG.pyth
+|               |__INSTRUMENTS.pyth
+|               |__SEGMENTATION_BASELINE
+|                   |__swinl.pth
+|
 |__region_proposals
 |__run_files
 |__tapis
@@ -110,24 +116,20 @@ TAPIS
 
 Feel free to use soft/hard linking to other paths or to modify the directory structure, names, or locations of the files. However, you may also have to alter the .yaml config files or the bash running scripts. 
 
-### Alternative Download Methods
-
-If you cannot download the files from our server, you can find the compressed archive in this [Google Drive Link](https://drive.google.com/file/d/1Lf_OeSUzSRxyvcVSsH8_GkNLTYMmPnhV/view?usp=sharing).
-
 ## Running the code
 
 | Task | cross-val mAP | test mAP | config | run file | model path |
 | ----- | ----- | ----- | ----- | ----- | ----- |
-| Phases | 72.87 $\pm$ 1.66 | 74.06 | [PHASES](https://github.com/BCV-Uniandes/GraSP/blob/main/TAPIS/configs/GraSP/TAPIS_PHASES.yaml) | [phases](https://github.com/BCV-Uniandes/GraSP/blob/main/TAPIS/run_files/grasp_phases.sh) | *TAPIS/pretrained_models/PHASES* |
-| Steps | 49.165 $\pm$ 0.004 | 49.45 | [STEPS](https://github.com/BCV-Uniandes/GraSP/blob/main/TAPIS/configs/GraSP/TAPIS_STEPS.yaml) | [steps](https://github.com/BCV-Uniandes/GraSP/blob/main/TAPIS/run_files/grasp_steps.sh) | *TAPIS/pretrained_models/STEPS* |
-| Instruments | 90.28 $\pm$ 0.83 | 89.09 | [INSTRUMENTS](https://github.com/BCV-Uniandes/GraSP/blob/main/TAPIS/configs/GraSP/TAPIS_INSTRUMENTS.yaml) | [instruments](https://github.com/BCV-Uniandes/GraSP/blob/main/TAPIS/run_files/grasp_instruments.sh) | *TAPIS/pretrained_models/INSTRUMENTS* |
-| Actions | 34.27 $\pm$ 1.76 | 39.50 | [ACTIONS](https://github.com/BCV-Uniandes/GraSP/blob/main/TAPIS/configs/GraSP/TAPIS_ACTIONS.yaml) | [actions](https://github.com/BCV-Uniandes/GraSP/blob/main/TAPIS/run_files/grasp_actions.sh) | *TAPIS/pretrained_models/ACTIONS* |
+| Phases | 71.36 $\pm$ 1.3 | 76,72 | [PHASES](https://github.com/BCV-Uniandes/GraSP/blob/main/TAPIS/configs/GraSP/TAPIS/TAPIS_PHASES.yaml) | [phases](https://github.com/BCV-Uniandes/GraSP/blob/main/TAPIS/run_files/grasp_long-term.sh) | *TAPIS/pretrained_models/PHASES* |
+| Steps | 50.74 $\pm$ 2.53 | 52.01 | [STEPS](https://github.com/BCV-Uniandes/GraSP/blob/main/TAPIS/configs/GraSP/TAPIS/TAPIS_STEPS.yaml) | [steps](https://github.com/BCV-Uniandes/GraSP/blob/main/TAPIS/run_files/grasp_long-term.sh) | *TAPIS/pretrained_models/STEPS* |
+| Instruments | 90.28 $\pm$ 0.83 | 89.09 | [INSTRUMENTS](https://github.com/BCV-Uniandes/GraSP/blob/main/TAPIS/configs/GraSP/TAPIS/TAPIS_INSTRUMENTS.yaml) | [instruments](https://github.com/BCV-Uniandes/GraSP/blob/main/TAPIS/run_files/grasp_instruments.sh) | *TAPIS/pretrained_models/INSTRUMENTS* |
+| Actions | 35.46 $\pm$ 2.40 | 39.50 | [ACTIONS](https://github.com/BCV-Uniandes/GraSP/blob/main/TAPIS/configs/GraSP/TAPIS/TAPIS_ACTIONS.yaml) | [actions](https://github.com/BCV-Uniandes/GraSP/blob/main/TAPIS/run_files/grasp_actions.sh) | *TAPIS/pretrained_models/ACTIONS* |
 
 We provide bash scripts with the default parameters to evaluate each GraSP task. Please first download our preprocessed data files and pretrained models as instructed earlier and run the following commands to run evaluation on each task:
 
 ```sh
 # Run the script corresponding to the desired task to evaluate
-$ sh run_files/grasp_<actions/instruments/phases/steps>
+$ sh run_files/grasp_<actions/instruments/phases/steps/long-term/short-term_rpn>
 ```
 
 ### Training TAPIS
@@ -170,7 +172,7 @@ $ python evaluate.py --coco_anns_path /path/to/coco/annotations/json \
 --pred-path /path/to/predictions/json or pth \
 --output_path /path/to/output/directory \
 --tasks <instruments/actions/phases/steps> \
---metrics <mAP/mAP@0.5IoU_box/mAP@0.5IoU_segm/mIoU> \
+--metrics <mAP/mAP@0.5IoU_box/mAP@0.5IoU_segm/mIoU/mAP_pres> \
 (optional) --masks-path /path/to/segmentation/masks \
 # Optional for detectron2 outputs
 --filter \
@@ -228,11 +230,15 @@ OUTPUT_DIR output/path
 
 ### Region Features
 
-Our code stores the region features corresponding to the predicted segments in the same results files in the output directory. However, you can use the [match_annots_n_preds.py](https://github.com/BCV-Uniandes/GraSP/blob/main/TAPIS/data/match_annots_n_preds.py) script to filter predictions, assign region features to ground truth instances for training, and parse predictions into necessary files for TAPIS. Use the code as follows:
+Our code allows calculating region features during training and validation (on the fly) or storing precalculated region features:
+
+Our published results are based on stored region features, as calculating features on the fly significantly increases computational complexity and slows training down. Our code stores the region features corresponding to the predicted segments in the same results files in the output directory of the segmentation baseline. However, you can use the [match_annots_n_preds.py](https://github.com/BCV-Uniandes/GraSP/blob/main/TAPIS/data/match_annots_n_preds.py) script to filter predictions, assign region features to ground truth instances for training, and parse predictions into necessary files for TAPIS. Use the code as follows:
 
 ```sh
 $ python match_annots_n_preds.py 
 ```
+
+To calculate region features on the fly, we provide an example of configuring our code in the ```run_files/grasp_short-term_rpn.sh``` file.
 
 ### MATIS Baseline for Endovis 2017 and 2018
 
@@ -242,7 +248,7 @@ To run our segmentation baseline in the Endovis 2017 and 2018 datasets, please d
 
 ## Contact
 
-If you have any doubts, questions, issues, corrections, or comments, please email n.ayobi@uniandes.edu.co.
+If you have any doubts, questions, issues, or comments, please email n.ayobi@uniandes.edu.co.
 
 ## Citing TAPIS 
 

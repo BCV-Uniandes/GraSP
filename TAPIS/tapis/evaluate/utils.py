@@ -196,7 +196,11 @@ def mask_to_rle(mask):
     '''
     
     # Convert the binary mask to a Fortran-contiguous array and encode it to RLE format
-    return m.encode(np.asfortranarray(mask))
+    rle = m.encode(np.asfortranarray(mask))
+
+    # Convert bytes to string for JSON compatibility
+    rle['counts'] = rle['counts'].decode('utf-8')
+    return rle
     
 def decode_polygon_to_mask(polygons, width, height):
     '''
@@ -350,6 +354,14 @@ def xywh_to_x1y1x2y2(bbox):
     
     # Return the converted bounding box
     return xy_bbox
+
+def xywhbbox_to_dxdydxdybbox(bbox, width, height):
+    d_bbox = [bbox[0], bbox[1], bbox[2]+bbox[0], bbox[3]+bbox[1]]
+    d_bbox[0] /= width
+    d_bbox[1] /= height
+    d_bbox[2] /= width
+    d_bbox[3] /= height
+    return d_bbox
 
 def roundbox(box):
     keys = box.split(' ')

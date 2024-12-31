@@ -4,6 +4,7 @@ https://github.com/SwinTransformer/Video-Swin-Transformer
 Liu, Ning, Cao, Wei, Zhang, Lin, and Hu
 """
 
+from copy import deepcopy
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -493,11 +494,21 @@ class VideoSwinTransformer(nn.Module):
                  ):
         super().__init__()
 
-        self.tasks = cfg.TASKS.TASKS
-        self.num_classes = cfg.TASKS.NUM_CLASSES
-        self.act_fun = cfg.TASKS.HEAD_ACT
-        # Video Swin Transformers config
+        # Prepare GraSP tasks
+        self.tasks = deepcopy(cfg.TASKS.TASKS)
+        self.num_classes = deepcopy(cfg.TASKS.NUM_CLASSES)
+        self.act_fun = deepcopy(cfg.TASKS.HEAD_ACT)
+        self.regions = cfg.REGIONS.ENABLE
+        self.recogn = cfg.TASKS.PRESENCE_RECOGNITION
+        self._frame_tasks = {task for task in cfg.TASKS.TASKS if task not in cfg.ENDOVIS_DATASET.REGION_TASKS}
+        if cfg.REGIONS.ENABLE:
+            self.features = cfg.FEATURES.ENABLE
+            self._region_tasks = {task for task in cfg.TASKS.TASKS if task in cfg.ENDOVIS_DATASET.REGION_TASKS}
+            if cfg.TASKS.PRESENCE_RECOGNITION:
+                self.recog_tasks = set(cfg.TASKS.PRESENCE_TASKS)
+        self.multiple_cls_embeds = cfg.TASKS.MULTIPLE_CLS
         
+        # Video Swin Transformers config
         self.pretrained = cfg.VST.PRETRAINED
         self.pretrained2d = cfg.VST.PRETRAINED2D
         self.num_layers = len(cfg.VST.DEPTHS)
@@ -540,39 +551,34 @@ class VideoSwinTransformer(nn.Module):
             self.layers.append(layer)
 
         self.num_features = int(self.embed_dim * 2**(self.num_layers-1))
-        # TODO Look what is this
         
-        dim_out = 1024
-        pool_size =2
         # add a norm layer for each output
         self.norm = norm_layer(self.num_features)
 
         self._freeze_stages()
+
         for idx, task in enumerate(self.tasks):
-            if task == 'tools' or task == 'actions':
-                extra_head = head_helper.TransformerRoIHead(
-                            cfg,
-                            dim_in= dim_out * cfg.DETECTION.ROI_XFORM_RESOLUTION**2,
-                            num_classes=self.num_classes[idx],
-                            pool_size=[
-                                        cfg.DATA.NUM_FRAMES
-                                            // pool_size,
-                                            1,
-                                            1,
-                                        ],
-                            resolution=[cfg.DETECTION.ROI_XFORM_RESOLUTION] * 2,
-                            scale_factor=cfg.DETECTION.SPATIAL_SCALE_FACTOR,
-                            dropout_rate=cfg.MODEL.DROPOUT_RATE,
-                            act_func=self.act_fun[idx],
-                            aligned=cfg.DETECTION.ALIGNED,
-                            )
+            if self.regions and task in self._region_tasks:
+                if self.features:
+                    extra_head = head_helper.TransformerRoIHead(
+                                cfg,
+                                num_classes=self.num_classes[idx],
+                                dropout_rate=cfg.MODEL.DROPOUT_RATE,
+                                act_func=self.act_fun[idx],
+                                cls_embed=False
+                                )
+                else:
+                    pass
             else:
                 extra_head = head_helper.TransformerBasicHead(
-                            1024,
+                            self.num_features,
                             self.num_classes[idx],
                             dropout_rate=cfg.MODEL.DROPOUT_RATE,
                             act_func=self.act_fun[idx],
+                            cls_embed=False,
+                            recognition=False
                         )
+                
             self.add_module("extra_heads_{}".format(task), extra_head)
         
     def _freeze_stages(self):
@@ -663,9 +669,9 @@ class VideoSwinTransformer(nn.Module):
         else:
             raise TypeError('pretrained must be a str or None')
 
-    def forward(self, x, bboxes=None, features=None):
+    def forward(self, x, features=None, boxes_mask=None, **kwargs):
         """Forward function."""
-        
+
         out = {k:[] for k in self.tasks}
         x = x[0]
         x = self.patch_embed(x)
@@ -681,15 +687,19 @@ class VideoSwinTransformer(nn.Module):
         
         # Features to TAPIR head
         x = x.reshape(x.shape[0], -1, x.shape[-1])
-        multi_faster = torch.tensor(0)
+        # TAPIS head classification
         for task in self.tasks:
             extra_head = getattr(self, "extra_heads_{}".format(task))
-            if task == 'tools' or task == 'actions':
-                out_features = extra_head(x, thw, bboxes, features)
-                out[task].append(out_features)
+            if task in self._frame_tasks and self.multiple_cls_embeds:
+                cls_idx = list(self._frame_tasks).index(task)
             else:
-                t = x.mean(1)
-                out[task].append(extra_head(t))
+                cls_idx = 0
+                
+            out[task] = extra_head(x, cls_idx=cls_idx, features=features, boxes_mask=boxes_mask)
+
+            if self.recogn and task in self.recog_tasks:
+                out[f'{task}_presence'] = getattr(self, "extra_heads_{}_presence".format(task))(x=x, features=features, boxes_mask=boxes_mask)
+            
 
         return out
 

@@ -3,6 +3,7 @@
 
 """ResNe(X)t 3D stem helper."""
 
+import torch
 import torch.nn as nn
 
 
@@ -40,7 +41,6 @@ class VideoModelStem(nn.Module):
         The `__init__` method of any subclass should also contain these
         arguments. List size of 1 for single pathway models (C2D, I3D, Slow
         and etc), list size of 2 for two pathway models (SlowFast).
-
         Args:
             dim_in (list): the list of channel dimensions of the inputs.
             dim_out (list): the output dimension of the convolution in the stem
@@ -145,7 +145,6 @@ class ResNetBasicStem(nn.Module):
     ):
         """
         The `__init__` method of any subclass should also contain these arguments.
-
         Args:
             dim_in (int): the channel dimension of the input. Normally 3 is used
                 for rgb input, and 2 or 3 is used for optical flow input.
@@ -224,7 +223,6 @@ class X3DStem(nn.Module):
     ):
         """
         The `__init__` method of any subclass should also contain these arguments.
-
         Args:
             dim_in (int): the channel dimension of the input. Normally 3 is used
                 for rgb input, and 2 or 3 is used for optical flow input.
@@ -316,7 +314,9 @@ class PatchEmbed(nn.Module):
             padding=padding,
         )
 
-    def forward(self, x):
+    def forward(self, x, keep_spatial=False):
         x = self.proj(x)
+        if keep_spatial:
+            return x, x.shape
         # B C (T) H W -> B (T)HW C
-        return x.flatten(2).transpose(1, 2)
+        return x.flatten(2).transpose(1, 2), x.shape

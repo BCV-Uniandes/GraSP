@@ -7,17 +7,17 @@ import sklearn
 import argparse
 import pandas as pd
 
-from .classification_eval import eval_classification
+from .classification_eval import eval_classification, eval_presence
 from .detection_eval import eval_detection
 from .semantic_segmentation_eval import eval_segmentation as eval_sem_segmentation
 from .instance_segmentation_eval import eval_segmentation as eval_inst_segmentation
 from .utils import load_json, save_json
 
-def eval_segmentation(task, coco_anns, preds, img_ann_dict, mask_path):
-    inst_seg_results, aux_inst_seg = eval_inst_segmentation(task, coco_anns, preds, img_ann_dict, mask_path)
+def eval_segmentation(task, coco_anns, preds, img_ann_dict, mask_path, **kwargs):
+    inst_seg_results, aux_inst_seg = eval_inst_segmentation(task, coco_anns, preds, img_ann_dict)
     print('{} task mAP@0.5IoU_segm: {}'.format(task, round(inst_seg_results,8)))
     
-    sem_seg_results, aux_sem_seg = eval_sem_segmentation(task, coco_anns, preds, img_ann_dict, mask_path)
+    sem_seg_results, aux_sem_seg = eval_sem_segmentation(task, coco_anns, preds, img_ann_dict, mask_path=mask_path)
     print('{} task mIoU: {}'.format(task, round(sem_seg_results,8)))
     
     inst_seg_results = {'mAP@0.5IoU_segm': inst_seg_results}
@@ -31,11 +31,13 @@ METRIC_DICT = {'mAP': eval_classification,
                'mAP@0.5IoU_segm': eval_inst_segmentation,
                'mIoU': eval_sem_segmentation,
                'mIoU_mAP@0.5': eval_segmentation,
+               'mAP_pres': eval_presence,
                'classification': eval_classification,
                'detection': eval_detection,
                'inst_segmentation': eval_inst_segmentation,
                'sem_segmentation': eval_sem_segmentation,
-               'segmentation': eval_segmentation}
+               'segmentation': eval_segmentation,
+               'presence': eval_presence}
 
 def get_img_ann_dict(coco_anns,task):
     img_ann_dict = {}
@@ -56,7 +58,7 @@ def eval_task(task, metric, coco_anns, preds, masks_path):
     except KeyError:
         raise NotImplementedError(f'Metric {metric} is not supported')
     
-    main_metric, aux_metrics = metric_funct(task, coco_anns, preds, img_ann_dict, masks_path)
+    main_metric, aux_metrics = metric_funct(task, coco_anns, preds, img_ann_dict=img_ann_dict, mask_path=masks_path)
     return main_metric, aux_metrics
 
 

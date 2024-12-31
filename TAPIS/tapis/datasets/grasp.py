@@ -17,15 +17,15 @@ logger = logging.getLogger(__name__)
 @DATASET_REGISTRY.register()
 class Grasp(SurgicalDataset):
     """
-    PSI-AVA dataloader.
+    GraSP dataloader.
     """
 
-    def __init__(self, cfg, split):
+    def __init__(self, cfg, split, load=True):
         self.dataset_name = "GraSP"
         self.zero_fill = 9
         self.image_type = "jpg"
         self.fps_videos = {'CASE021','CASE041','CASE047','CASE050','CASE051','CASE053'}
-        super().__init__(cfg,split)
+        super().__init__(cfg,split,load)
     
     def keyframe_mapping(self, video_idx, sec_idx, sec):
         try:
@@ -40,6 +40,16 @@ class Grasp(SurgicalDataset):
                 return round((sec*30)/45) 
         except:
             breakpoint()
+    
+    def frame_name_spliting(self, video_name, sec):
+        video_num = int(video_name.replace('CASE',''))
+        return [video_num,sec]
+    
+    def frame_num_joining(self, video_num, sec):
+        return f'CASE{video_num:03d}/{sec:0{self.zero_fill}d}.{self.image_type}'
+    
+    def frame_name_joining(self, video_name, sec):
+        return f"{video_name}/{sec:0{self.zero_fill}d}.{self.image_type}"
         
     def __getitem__(self, idx):
         """
@@ -55,28 +65,29 @@ class Grasp(SurgicalDataset):
             extra_data (dict): a dict containing extra data fields, like "boxes",
                 "ori_boxes" and "metadata".
         """
-        # breakpoint()
         # Get the path of the middle frame 
         video_idx, sec_idx, sec, center_idx = self._keyframe_indices[idx]
         video_name = self._video_idx_to_name[video_idx]
-        complete_name = '{}/{}.{}'.format(video_name, str(sec).zfill(self.zero_fill), self.image_type)
+        complete_name = self.frame_name_joining(video_name, sec)
 
-        #TODO: REMOVE when all done
+        #TODO: These are just security checks, REMOVE when all done
         folder_to_images = "/".join(self._image_paths[video_idx][0].split('/')[:-2])
         path_complete_name = os.path.join(folder_to_images,complete_name)
         found_idx = self._image_paths[video_idx].index(path_complete_name)
-
         assert path_complete_name == self._image_paths[video_idx][center_idx], f'Different paths {path_complete_name} & {self._image_paths[video_idx][center_idx]} & {sec_idx} & {sec}'
         assert found_idx == center_idx, f'Different indexes {found_idx} & {center_idx}'
         assert int(self._image_paths[video_idx][center_idx].split('/')[-1].replace('.'+self.image_type,''))==sec, f'Different {self._image_paths[video_idx][center_idx].split("/")[-1].replace("."+self.image_type,"")} {sec}'
 
         # Get the frame idxs for current clip.
-        seq = utils.get_sequence(
-            center_idx,
-            self._seq_len // 2,
-            self._sample_rate,
-            num_frames=len(self._image_paths[video_idx]),
-        )
+        if self._video_length> 1:
+            seq = utils.get_sequence(
+                center_idx,
+                self._seq_len // 2,
+                self._sample_rate,
+                num_frames=len(self._image_paths[video_idx]),
+            )
+        else:
+            seq = [center_idx]
 
         assert center_idx in seq, f'Center index {center_idx} not in sequence {seq}'
         clip_label_list = deepcopy(self._keyframe_boxes_and_labels[video_idx][sec_idx])
@@ -84,7 +95,7 @@ class Grasp(SurgicalDataset):
 
         # Get boxes and labels for current clip.
         boxes = []
-        
+
         # Add labels depending on the task
         all_labels = {task:[] for task in self._region_tasks}
         
@@ -132,13 +143,12 @@ class Grasp(SurgicalDataset):
                 label_list = [label[task] for label in clip_label_list]
                 assert all(type(label_list[0])==type(lab_item) for lab_item in label_list), f'Inconsistent label type {label_list} in frame {complete_name}'
                 if isinstance(label_list[0], list):
-                    label_list = set(list(itertools.chain(*label_list)))
-                    binary_task_label[label_list] = 1
+                    label_list = list(set(itertools.chain(*label_list)))
                 elif isinstance(label_list[0], int):
-                    label_list = set(label_list)
-                    binary_task_label[label_list] = 1
+                    label_list = list(set(label_list))
                 else:
                     raise ValueError(f'Do not support annotation {label_list[0]} of type {type(label_list[0])} in frame {complete_name}')
+                binary_task_label[label_list] = 1
                 all_labels[task] = binary_task_label[1:]
 
         for task in self._frame_tasks:
@@ -164,17 +174,21 @@ class Grasp(SurgicalDataset):
         imgs = utils.retry_load_images(
             image_paths, backend=self.cfg.ENDOVIS_DATASET.IMG_PROC_BACKEND
         )
+
+        if self.cfg.FEATURES.USE_RPN:
+            image = imgs[len(imgs)//2]
+        else:
+            image = None
         
         # Preprocess images and boxes
-        imgs, boxes = self._images_and_boxes_preprocessing_cv2(
-            imgs, boxes=boxes
+        imgs, boxes, image = self._images_and_boxes_preprocessing_cv2(
+            imgs, boxes=boxes, image=image
         )
         
         # Padding and masking for a consistent dimensions in batch
         if self.cfg.REGIONS.ENABLE and len(ori_boxes):
             max_boxes = self.cfg.DATA.MAX_BBOXES * 2 if self.cfg.ENDOVIS_DATASET.INCLUDE_GT else self.cfg.DATA.MAX_BBOXES
 
-            # TODO: REMOVE when all done
             assert len(boxes)==len(ori_boxes)==len(rpn_features), f'Inconsistent lengths {len(boxes)} {len(ori_boxes)} {len(rpn_features)}'
             assert len(boxes)<= max_boxes and len(ori_boxes)<=max_boxes and len(rpn_features)<=max_boxes, f'More boxes than max box num {len(boxes)} {len(ori_boxes)} {len(rpn_features)}'
 
@@ -190,7 +204,7 @@ class Grasp(SurgicalDataset):
 
             if self.cfg.FEATURES.ENABLE:
                 if len(rpn_features)<max_boxes:
-                    c_rpn_features = np.concatenate((rpn_features,np.zeros((max_boxes-len(rpn_features), 256 if self.cfg.FEATURES.MODEL=='detr' else (512 if self.cfg.FEATURES.MODEL=='m2f' else 1024)))),axis=0)
+                    c_rpn_features = np.concatenate((rpn_features,np.zeros((max_boxes-len(rpn_features), self.cfg.FEATURES.DIM_FEATURES))),axis=0)
                     rpn_features = c_rpn_features
                 extra_data["rpn_features"] = rpn_features
         elif self.cfg.REGIONS.ENABLE:
@@ -204,9 +218,11 @@ class Grasp(SurgicalDataset):
         
         imgs = utils.pack_pathway_output(self.cfg, imgs)
 
+        if image is not None:
+            extra_data['images'] = image
+
         if self.cfg.NUM_GPUS>1:
-            video_num = int(video_name.replace('CASE',''))
-            frame_identifier = [video_num,sec]
+            frame_identifier = self.frame_name_spliting(video_name, sec)
         else:
             frame_identifier = complete_name
         

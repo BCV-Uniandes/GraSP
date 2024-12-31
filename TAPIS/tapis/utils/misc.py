@@ -17,6 +17,7 @@ from torch import nn
 import tapis.utils.logging as logging
 import tapis.utils.multiprocessing as mpu
 from tapis.models.batchnorm_helper import SubBatchNorm3d
+from tapis.datasets.utils import pack_pathway_output
 
 logger = logging.get_logger(__name__)
 
@@ -89,32 +90,48 @@ def _get_model_analysis_input(cfg, use_input_frames):
     """
     rgb_dimension = 3
     if use_input_frames:
-        input_tensors = [torch.rand(1,
+        input_tensors = torch.rand(
                         rgb_dimension,
                         cfg.DATA.NUM_FRAMES,
                         cfg.DATA.TRAIN_CROP_SIZE,
-                        cfg.DATA.TRAIN_CROP_SIZE,
-        )]
-        if cfg.NUM_GPUS:
-            input_tensors[0] = input_tensors[0].cuda(non_blocking=True)
-    else:
-        input_tensors = torch.rand(
-            1, 7*7*cfg.DATA.NUM_FRAMES//2, 768
+                        cfg.DATA.TRAIN_CROP_SIZE_LARGE,
         )
+        input_tensors = pack_pathway_output(cfg, input_tensors)
+        input_tensors = [input.unsqueeze(0) for input in input_tensors]
+        if cfg.NUM_GPUS:
+            input_tensors = [input.cuda(non_blocking=True) for input in input_tensors]
+    else:
+        final_dim = int(cfg.MVIT.EMBED_DIM * math.prod([dim_mul[-1] for dim_mul in cfg.MVIT.DIM_MUL]))
+        time_resolution = cfg.DATA.NUM_FRAMES // cfg.MVIT.PATCH_STRIDE[0]
+        h_resolution = (cfg.DATA.TEST_CROP_SIZE // cfg.MVIT.PATCH_STRIDE[1]) // math.prod([q_pool[-1] for q_pool in cfg.MVIT.POOL_Q_STRIDE])
+        w_resolution = (cfg.DATA.TEST_CROP_SIZE_LARGE // cfg.MVIT.PATCH_STRIDE[2]) // math.prod([q_pool[-1] for q_pool in cfg.MVIT.POOL_Q_STRIDE])
+        
+        input_tensors = torch.rand(1, time_resolution*h_resolution*w_resolution, final_dim)
         
         if cfg.NUM_GPUS:
             input_tensors = input_tensors.cuda(non_blocking=True)
 
-    # If detection is enabled, count flops for one proposal.
+    # If detection is enabled, count flops for max region proposal.
     if cfg.REGIONS.ENABLE:
-        bbox = np.random.rand(1,cfg.DATA.MAX_BBOXES * 2, 256 if cfg.FEATURES.MODEL=='detr' \
-                              else (512 if cfg.FEATURES.MODEL=='m2f' else 1024))
-        bbox = torch.tensor(bbox).float()
-        bbox_mask = torch.ones(bbox.shape[:-1]).bool()
+        max_boxes = cfg.DATA.MAX_BBOXES * 2 if cfg.ENDOVIS_DATASET.INCLUDE_GT else cfg.DATA.MAX_BBOXES
+        features = np.random.rand(1, max_boxes, cfg.FEATURES.DIM_FEATURES)
+        features = torch.tensor(features).float()
+        bbox_mask = torch.ones(features.shape[:-1]).bool()
         if cfg.NUM_GPUS:
-            bbox = bbox.cuda()
+            features = features.cuda()
             bbox_mask = bbox_mask.cuda()
-        inputs = (input_tensors, bbox, bbox_mask)
+        if cfg.FEATURES.USE_RPN and use_input_frames:
+            ratio = cfg.DATA.TEST_CROP_SIZE_LARGE/cfg.DATA.TEST_CROP_SIZE
+            images = torch.tensor(np.random.rand(1, 3, cfg.FEATURES.RPN_CFG.INPUT.IMAGE_SIZE, round(ratio*cfg.FEATURES.RPN_CFG.INPUT.IMAGE_SIZE))).float()
+            bboxes = torch.tensor(np.zeros((1, max_boxes, 4)))
+            bboxes[:,:,1] = cfg.DATA.TEST_CROP_SIZE
+            bboxes[:,:,3] = cfg.DATA.TEST_CROP_SIZE_LARGE
+            if cfg.NUM_GPUS:
+                images = images.cuda()
+                bboxes = bboxes.cuda()
+            inputs = (input_tensors, None, bbox_mask, images, bboxes)
+        else:
+            inputs = (input_tensors, features, bbox_mask)
     else:
         inputs = (input_tensors,)
     return inputs

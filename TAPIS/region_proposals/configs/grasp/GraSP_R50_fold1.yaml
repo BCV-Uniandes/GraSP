@@ -1,7 +1,5 @@
 _BASE_: Base-GraSP-InstanceSegmentation.yaml
 DATASETS:
-  TRAIN_FOLD: "fold1"
-  TEST_FOLD: "fold2"
   TRAIN: ("grasp_fold1",)
   TEST: ("grasp_fold2",)
 SOLVER:

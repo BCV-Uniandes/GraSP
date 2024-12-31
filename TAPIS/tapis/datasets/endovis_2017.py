@@ -22,12 +22,25 @@ class Endovis_2017(SurgicalDataset):
     EndoVis 2017 dataloader.
     """
 
-    def __init__(self, cfg, split):
+    def __init__(self, cfg, split, load=True):
         self.dataset_name = "EndoVis 2017"
         self.zero_fill = 3
         self.image_type = "png"
         self.fps = 1
-        super().__init__(cfg,split)
+        super().__init__(cfg,split,load)
+    
+    def keyframe_mapping(self, video_idx, sec_idx, sec):
+        return sec
+    
+    def frame_name_spliting(self, video_name, sec):
+        video_num = int(video_name[3:])
+        return [video_num,sec]
+    
+    def frame_num_joining(self, video_num, sec):
+        return self.frame_name_joining(video_num, sec)
+    
+    def frame_name_joining(self, video_name, sec):
+        return f"seq{video_name[3:]}_frame{sec:0{self.zero_fill}d}.{self.image_type}"
 
     def __getitem__(self, idx):
         """
@@ -48,7 +61,7 @@ class Endovis_2017(SurgicalDataset):
         video_name = self._video_idx_to_name[video_idx]
         complete_name = 'seq{}_frame{}.{}'.format(video_name[3:], str(sec).zfill(self.zero_fill), self.image_type)
 
-        #TODO: REMOVE when all done
+        #TODO: These are just security checks, REMOVE when all done
         folder_to_images = "/".join(self._image_paths[video_idx][0].split('/')[:-1])
         path_complete_name = os.path.join(folder_to_images,complete_name)
         found_idx = self._image_paths[video_idx].index(path_complete_name)
@@ -94,15 +107,7 @@ class Endovis_2017(SurgicalDataset):
                             rpn_features.append(features)
                         except:
 
-                            if self.cfg.FEATURES.MODEL=='detr':
-                                # Deformable DETR extracted features size is 256
-                                rpn_features.append(np.zeros(256))
-                                
-                            elif self.cfg.FEATURES.MODEL=='faster':
-                                # Faster-RCNN extracted features size is 1024
-                                rpn_features.append(np.zeros(1024))
-                                
-                            logger.info(f"=== No box features found for frame {path_complete_name} ===")
+                            rpn_features.append(np.zeros(self.cfg.FEATURES.DIM_FEATURES))
 
                     for task in self._region_tasks:
                         if isinstance(box_labels[task],list):
@@ -164,7 +169,6 @@ class Endovis_2017(SurgicalDataset):
         # Padding and masking for a consistent dimensions in batch
         if self.cfg.REGIONS.ENABLE and len(ori_boxes):
 
-            # TODO: REMOVE when all done
             assert len(boxes)==len(ori_boxes)==len(rpn_features), f'Inconsistent lengths {len(boxes)} {len(ori_boxes)} {len(rpn_features)}'
             assert len(boxes)<= max_boxes and len(ori_boxes)<=max_boxes and len(rpn_features)<=max_boxes, f'Incorrect lengths respect max box num{len(boxes)} {len(ori_boxes)} {len(rpn_features)}'
 
@@ -180,7 +184,7 @@ class Endovis_2017(SurgicalDataset):
 
             if self.cfg.FEATURES.ENABLE:
                 if len(rpn_features)<max_boxes:
-                    c_rpn_features = np.concatenate((rpn_features,np.zeros((max_boxes-len(rpn_features), 256 if self.cfg.FEATURES.MODEL=='detr' else 1024))),axis=0)
+                    c_rpn_features = np.concatenate((rpn_features,np.zeros((max_boxes-len(rpn_features), self.cfg.FEATURES.DIM_FEATURES))),axis=0)
                     rpn_features = c_rpn_features
                 extra_data["rpn_features"] = rpn_features
         
@@ -191,9 +195,14 @@ class Endovis_2017(SurgicalDataset):
             extra_data["boxes"] = boxes
 
             if self.cfg.FEATURES.ENABLE:
-                extra_data["rpn_features"] = np.zeros((max_boxes, 256 if self.cfg.FEATURES.MODEL=='detr' else 1024))
+                extra_data["rpn_features"] = np.zeros((max_boxes, self.cfg.FEATURES.DIM_FEATURES))
 
         
         imgs = utils.pack_pathway_output(self.cfg, imgs)
         
-        return imgs, all_labels, extra_data, complete_name
+        if self.cfg.NUM_GPUS>1:
+            frame_identifier = self.frame_name_spliting(video_name, sec)
+        else:
+            frame_identifier = complete_name
+        
+        return imgs, all_labels, extra_data, frame_identifier

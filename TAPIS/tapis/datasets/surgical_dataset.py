@@ -17,7 +17,7 @@ class SurgicalDataset(torch.utils.data.Dataset):
     We adapt the AVA Dataset management in Slowfast to manage Endoscopic Vision databases.
     """
 
-    def __init__(self, cfg, split):
+    def __init__(self, cfg, split, load=True):
         self.cfg = cfg
         self._split = split
         self._sample_rate = cfg.DATA.SAMPLING_RATE
@@ -33,7 +33,7 @@ class SurgicalDataset(torch.utils.data.Dataset):
         self._use_bgr = cfg.ENDOVIS_DATASET.BGR
         self.random_horizontal_flip = cfg.DATA.RANDOM_FLIP
         if self._split == "train":
-            self._crop_size = cfg.DATA.TRAIN_CROP_SIZE
+            self._crop_size = (cfg.DATA.TRAIN_CROP_SIZE, cfg.DATA.TRAIN_CROP_SIZE_LARGE)
             self._jitter_min_scale = cfg.DATA.TRAIN_JITTER_SCALES[0]
             self._jitter_max_scale = cfg.DATA.TRAIN_JITTER_SCALES[1]
             self._use_color_augmentation = cfg.ENDOVIS_DATASET.TRAIN_USE_COLOR_AUGMENTATION
@@ -41,13 +41,27 @@ class SurgicalDataset(torch.utils.data.Dataset):
             self._pca_eigval = cfg.DATA.TRAIN_PCA_EIGVAL
             self._pca_eigvec = cfg.DATA.TRAIN_PCA_EIGVEC
         else:
-            self._crop_size = cfg.DATA.TEST_CROP_SIZE
+            self._crop_size = (cfg.DATA.TEST_CROP_SIZE, cfg.DATA.TEST_CROP_SIZE_LARGE)
             self._test_force_flip = cfg.ENDOVIS_DATASET.TEST_FORCE_FLIP
+            self.aspect_ratio_th = cfg.ENDOVIS_DATASET.ASPECT_RATION_TH
         
-        self._load_data(cfg)
+        if load:
+            self._load_data(cfg)
     
     @abstractmethod
     def keyframe_mapping(self, video_idx, sec_idx, sec):
+        pass
+    
+    @abstractmethod
+    def frame_spliting(self, video_name, sec):
+        pass
+    
+    @abstractmethod
+    def frame_num_joining(self, video_num, sec):
+        pass
+    
+    @abstractmethod
+    def frame_name_joining(self, video_name, sec):
         pass
 
     def _load_data(self, cfg):
@@ -79,10 +93,12 @@ class SurgicalDataset(torch.utils.data.Dataset):
             self._keyframe_indices,
             self._keyframe_boxes_and_labels,
         ) = data_helper.get_keyframe_data(boxes_and_labels, self.keyframe_mapping)
-        # Calculate the number of used boxes.
-        self._num_boxes_used = data_helper.get_num_boxes_used(
-            self._keyframe_indices, self._keyframe_boxes_and_labels
-        )
+        
+        if self.cfg.REGIONS.ENABLE:
+            # Calculate the number of used boxes.
+            self._num_boxes_used = data_helper.get_num_boxes_used(
+                self._keyframe_indices, self._keyframe_boxes_and_labels
+            )
 
         # Read Region features
         if cfg.FEATURES.ENABLE:
@@ -99,7 +115,8 @@ class SurgicalDataset(torch.utils.data.Dataset):
         )
         logger.info("Number of frames: {}".format(total_frames))
         logger.info("Number of key frames: {}".format(len(self)))
-        logger.info("Number of boxes: {}.".format(self._num_boxes_used))
+        if self.cfg.REGIONS.ENABLE:
+            logger.info("Number of instances: {}.".format(self._num_boxes_used))
 
     def __len__(self):
         """
@@ -116,7 +133,7 @@ class SurgicalDataset(torch.utils.data.Dataset):
         """
         return len(self._keyframe_indices)
 
-    def _images_and_boxes_preprocessing_cv2(self, imgs, boxes):
+    def _images_and_boxes_preprocessing_cv2(self, imgs, boxes, image=None):
         """
         This function performs preprocessing for the input images and
         corresponding boxes for one clip with opencv as backend.
@@ -129,15 +146,13 @@ class SurgicalDataset(torch.utils.data.Dataset):
             imgs (tensor): list of preprocessed images.
             boxes (ndarray): preprocessed boxes.
         """
-
         height, width, _ = imgs[0].shape
         boxes = cv2_transform.clip_boxes_to_image(boxes, height, width)
 
         # `transform.py` is list of np.array. However, we only have
         # one np.array.
-        # breakpoint()
         boxes = [boxes.astype('float')]
-
+        
         # The image now is in HWC, BGR format.
         if self._split == "train" and not self.cfg.DATA.JUST_CENTER:  # "train"
             imgs, boxes = cv2_transform.random_short_side_scale_jitter_list(
@@ -146,31 +161,49 @@ class SurgicalDataset(torch.utils.data.Dataset):
                 max_size=self._jitter_max_scale,
                 boxes=boxes,
             )
-            imgs, boxes = cv2_transform.random_crop_list(
-                imgs, self._crop_size, order="HWC", boxes=boxes
+            imgs, boxes, image = cv2_transform.random_crop_list(
+                imgs, self._crop_size, order="HWC", boxes=boxes, image=image
             )
 
             if self.random_horizontal_flip:
+
+                if image is not None:
+                    imgs.append(image)
+
                 # random flip
                 imgs, boxes = cv2_transform.horizontal_flip_list(
                     0.5, imgs, order="HWC", boxes=boxes
                 )
+
+                if image is not None:
+                    image = imgs.pop()
+
         elif self._split == "val" or self.cfg.DATA.JUST_CENTER:
             # Short side to test_scale. Non-local and STRG uses 256.
-            imgs = [cv2_transform.scale(self._crop_size, img) for img in imgs]
+            imgs = [cv2_transform.scale(self._crop_size[0], img) for img in imgs]
             boxes = [
                 cv2_transform.scale_boxes(
-                    self._crop_size, boxes[0], height, width
+                    self._crop_size[0], boxes[0], height, width
                 )
             ]
-            imgs, boxes = cv2_transform.spatial_shift_crop_list(
-                self._crop_size, imgs, 1, boxes=boxes
+            imgs, boxes, _ = cv2_transform.spatial_shift_crop_list(
+                self._crop_size, imgs, 1, boxes=boxes, image=None
             )
+            
+            ori_aspect_ratio = (width/height)
+            crop_aspect_ratio = (self.cfg.DATA.TEST_CROP_SIZE_LARGE/self.cfg.DATA.TEST_CROP_SIZE)
+            assert image is None or ori_aspect_ratio-crop_aspect_ratio<self.aspect_ratio_th , f'Test aspect ratio difference is too large for inference with RPN'
 
             if not self.cfg.DATA.JUST_CENTER and self._test_force_flip:
+                if image is not None:
+                    imgs.append(image)
+
                 imgs, boxes = cv2_transform.horizontal_flip_list(
                     1, imgs, order="HWC", boxes=boxes
                 )
+
+                if image is not None:
+                    image = imgs.pop()
         else:
             raise NotImplementedError(
                 "Unsupported split mode {}".format(self._split)
@@ -181,14 +214,6 @@ class SurgicalDataset(torch.utils.data.Dataset):
 
         # Image [0, 255] -> [0, 1].
         imgs = [img / 255.0 for img in imgs]
-
-        imgs = [
-            np.ascontiguousarray(
-                # img.reshape((3, self._crop_size, self._crop_size))
-                img.reshape((3, imgs[0].shape[1], imgs[0].shape[2]))
-            ).astype(np.float32)
-            for img in imgs
-        ]
 
         # Do color augmentation (after divided by 255.0).
         if self._split == "train" and self._use_color_augmentation:
@@ -231,4 +256,8 @@ class SurgicalDataset(torch.utils.data.Dataset):
         boxes = cv2_transform.clip_boxes_to_image(
             boxes[0], imgs[0].shape[1], imgs[0].shape[2]
         )
-        return imgs, boxes
+        if image is not None:
+            image = cv2_transform.BGR2RGB(image)
+            image = cv2_transform.HWC2CHW(image)
+            image = torch.tensor(image)
+        return imgs, boxes, image

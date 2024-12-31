@@ -42,6 +42,7 @@ class MaskFormer(nn.Module):
         semantic_on: bool,
         panoptic_on: bool,
         instance_on: bool,
+        regions_on: bool,
         test_topk_per_image: int,
     ):
         """
@@ -88,6 +89,7 @@ class MaskFormer(nn.Module):
         self.semantic_on = semantic_on
         self.instance_on = instance_on
         self.panoptic_on = panoptic_on
+        self.regions_on = regions_on
         self.test_topk_per_image = test_topk_per_image
 
         if not self.semantic_on:
@@ -157,6 +159,7 @@ class MaskFormer(nn.Module):
             "semantic_on": cfg.MODEL.MASK_FORMER.TEST.SEMANTIC_ON,
             "instance_on": cfg.MODEL.MASK_FORMER.TEST.INSTANCE_ON,
             "panoptic_on": cfg.MODEL.MASK_FORMER.TEST.PANOPTIC_ON,
+            "regions_on": cfg.MODEL.MASK_FORMER.TEST.REGIONS_ON,
             "test_topk_per_image": cfg.TEST.DETECTIONS_PER_IMAGE,
         }
 
@@ -190,7 +193,10 @@ class MaskFormer(nn.Module):
                     segments_info (list[dict]): Describe each segment in `panoptic_seg`.
                         Each dict contains keys "id", "category_id", "isthing".
         """
-        images = [x["image"].to(self.device) for x in batched_inputs]
+        if type(batched_inputs[0])==dict:
+            images = [x["image"].to(self.device) for x in batched_inputs]
+        else:
+            images = [x for x in batched_inputs]
         images = [(x - self.pixel_mean) / self.pixel_std for x in images]
         images = ImageList.from_tensors(images, self.size_divisibility)
 
@@ -232,12 +238,11 @@ class MaskFormer(nn.Module):
 
             processed_results = []
             additions = []
-            for mask_cls_result, mask_pred_result, mask_embd, decod_out, input_per_image, image_size in zip(
-                mask_cls_results, mask_pred_results, mask_embd_results, decod_out_results, batched_inputs, images.image_sizes
+            for mask_cls_result, mask_pred_result, mask_embd, decod_out, image_size in zip(
+                mask_cls_results, mask_pred_results, mask_embd_results, decod_out_results, images.image_sizes
             ):
-                height = input_per_image.get("height", image_size[0])
-                width = input_per_image.get("width", image_size[1])
-                processed_results.append({})
+                height = image_size[0]
+                width = image_size[1]
                 # additions.append({})
 
                 if self.sem_seg_postprocess_before_inference:
@@ -245,23 +250,29 @@ class MaskFormer(nn.Module):
                         mask_pred_result, image_size, height, width
                     )
                     mask_cls_result = mask_cls_result.to(mask_pred_result)
-
-                # semantic segmentation inference
-                if self.semantic_on:
-                    r = retry_if_cuda_oom(self.semantic_inference)(mask_cls_result, mask_pred_result)
-                    if not self.sem_seg_postprocess_before_inference:
-                        r = retry_if_cuda_oom(sem_seg_postprocess)(r, image_size, height, width)
-                    processed_results[-1]["sem_seg"] = r
-
-                # panoptic segmentation inference
-                if self.panoptic_on:
-                    panoptic_r = retry_if_cuda_oom(self.panoptic_inference)(mask_cls_result, mask_pred_result)
-                    processed_results[-1]["panoptic_seg"] = panoptic_r
                 
-                # instance segmentation inference
-                if self.instance_on:
-                    instance_r = retry_if_cuda_oom(self.instance_inference)(mask_cls_result, mask_pred_result, mask_embd, decod_out)
-                    processed_results[-1]["instances"] = instance_r
+                if self.regions_on:
+                    regions = retry_if_cuda_oom(self.regions_inference)(mask_cls_result, mask_pred_result, decod_out)
+                    processed_results.append(regions)
+                else:
+                    processed_results.append({})
+
+                    # semantic segmentation inference
+                    if self.semantic_on:
+                        r = retry_if_cuda_oom(self.semantic_inference)(mask_cls_result, mask_pred_result)
+                        if not self.sem_seg_postprocess_before_inference:
+                            r = retry_if_cuda_oom(sem_seg_postprocess)(r, image_size, height, width)
+                        processed_results[-1]["sem_seg"] = r
+
+                    # panoptic segmentation inference
+                    if self.panoptic_on:
+                        panoptic_r = retry_if_cuda_oom(self.panoptic_inference)(mask_cls_result, mask_pred_result)
+                        processed_results[-1]["panoptic_seg"] = panoptic_r
+                    
+                    # instance segmentation inference
+                    if self.instance_on:
+                        instance_r = retry_if_cuda_oom(self.instance_inference)(mask_cls_result, mask_pred_result, mask_embd, decod_out)
+                        processed_results[-1]["instances"] = instance_r
 
             return processed_results
 
@@ -390,3 +401,24 @@ class MaskFormer(nn.Module):
         result.decod_out = decod_out
         result.pred_classes = labels_per_image
         return result
+    
+    def regions_inference(self, mask_cls, mask_pred, decod_out):
+
+        # [Q, K]
+        scores = F.softmax(mask_cls, dim=-1)[:, :-1]
+
+        # # scores_per_image, topk_indices = scores.flatten(0, 1).topk(self.num_queries, sorted=False)
+        # _, topk_indices = scores.flatten(0, 1).topk(self.test_topk_per_image, sorted=False)
+        # topk_indices = topk_indices // self.sem_seg_head.num_classes
+
+        _, topk_indices = scores.max(1)[0].topk(self.test_topk_per_image, sorted=False)
+        # mask_pred = mask_pred.unsqueeze(1).repeat(1, self.sem_seg_head.num_classes, 1).flatten(0, 1)
+        mask_pred = (mask_pred[topk_indices] >0).detach()
+        decod_out = decod_out[topk_indices].detach()
+
+        # pred_masks = (mask_pred > 0).float()
+        # result.pred_boxes = Boxes(torch.zeros(mask_pred.size(0), 4))
+        # Uncomment the following to get boxes from masks (this is slow)
+        pred_boxes = BitMasks(mask_pred).get_bounding_boxes()
+
+        return pred_boxes, decod_out, mask_pred.float()

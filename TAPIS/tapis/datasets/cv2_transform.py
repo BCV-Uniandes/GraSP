@@ -163,7 +163,7 @@ def horizontal_flip_list(prob, images, order="CHW", boxes=None):
     return images, boxes
 
 
-def spatial_shift_crop_list(size, images, spatial_shift_pos, boxes=None):
+def spatial_shift_crop_list(size, images, spatial_shift_pos, boxes=None, image=None):
     """
     Perform left, center, or right crop of the given list of images.
     Args:
@@ -185,32 +185,52 @@ def spatial_shift_crop_list(size, images, spatial_shift_pos, boxes=None):
 
     height = images[0].shape[0]
     width = images[0].shape[1]
-    y_offset = int(math.ceil((height - size) / 2))
-    x_offset = int(math.ceil((width - size) / 2))
+    y_offset = int(math.ceil((height - size[0]) / 2))
+    x_offset = int(math.ceil((width - size[1]) / 2))
 
     if height > width:
         if spatial_shift_pos == 0:
             y_offset = 0
         elif spatial_shift_pos == 2:
-            y_offset = height - size
+            y_offset = height - size[0]
     else:
         if spatial_shift_pos == 0:
             x_offset = 0
         elif spatial_shift_pos == 2:
-            x_offset = width - size
+            x_offset = width - size[1]
 
     cropped = [
-        image[y_offset : y_offset + size, x_offset : x_offset + size, :]
+        image[y_offset : y_offset + size[0], x_offset : x_offset + size[1], :]
         for image in images
     ]
-    assert cropped[0].shape[0] == size, "Image height not cropped properly"
-    assert cropped[0].shape[1] == size, "Image width not cropped properly"
+    assert cropped[0].shape[0] == size[0], "Image height not cropped properly"
+    assert cropped[0].shape[1] == size[1], "Image width not cropped properly"
+
+    if image is not None:
+        im_h = image.shape[0]
+        im_w = image.shape[1]
+
+        w_ratio = im_w/width
+        h_ratio = im_h/height
+        im_y_offset = round(y_offset*h_ratio)
+        y_size = round(size[0]*h_ratio)
+        im_x_offset = round(x_offset*w_ratio)
+        x_size = round(size[1]*w_ratio)
+
+        crop_image = image[im_y_offset : im_y_offset + y_size, 
+                           im_x_offset : im_x_offset + x_size,
+                           :]
+    
+        assert abs(crop_image.shape[0]/cropped[0].shape[0] - h_ratio)<1, f"Big image not cropped right {crop_image.shape[0]} {cropped[0].shape[0]} {crop_image.shape[0]/cropped[0].shape[0]} {h_ratio}"
+        assert abs(crop_image.shape[1]/cropped[0].shape[1] - w_ratio)<1, f"Big image not cropped right {crop_image.shape[1]} {cropped[0].shape[1]} {crop_image.shape[1]/cropped[0].shape[1]} {w_ratio}"
+    else:
+        crop_image = None
 
     if boxes is not None:
         for i in range(len(boxes)):
             boxes[i][:, [0, 2]] -= x_offset
             boxes[i][:, [1, 3]] -= y_offset
-    return cropped, boxes
+    return cropped, boxes, crop_image
 
 
 def CHW2HWC(image):
@@ -236,6 +256,11 @@ def HWC2CHW(image):
     """
     return image.transpose([2, 0, 1])
 
+def BGR2RGB(image):
+    return cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+
+def RGB2BGR(image):
+    return cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
 
 def color_jitter_list(
     images, img_brightness=0, img_contrast=0, img_saturation=0
@@ -391,7 +416,7 @@ def crop_boxes(boxes, x_offset, y_offset):
     return boxes
 
 
-def random_crop_list(images, size, pad_size=0, order="CHW", boxes=None):
+def random_crop_list(images, size, pad_size=0, order="CHW", boxes=None, image=None):
     """
     Perform random crop on a list of images.
     Args:
@@ -416,43 +441,83 @@ def random_crop_list(images, size, pad_size=0, order="CHW", boxes=None):
 
     # image format should be CHW.
     if order == "CHW":
-        if images[0].shape[1] == size and images[0].shape[2] == size:
+        if images[0].shape[1] == size[0] and images[0].shape[2] == size[1]:
             return images, boxes
         height = images[0].shape[1]
         width = images[0].shape[2]
         y_offset = 0
-        if height > size:
-            y_offset = int(np.random.randint(0, height - size))
+        if height > size[0]:
+            y_offset = int(np.random.randint(0, height - size[0]))
         x_offset = 0
-        if width > size:
-            x_offset = int(np.random.randint(0, width - size))
+        if width > size[1]:
+            x_offset = int(np.random.randint(0, width - size[1]))
         cropped = [
-            image[:, y_offset : y_offset + size, x_offset : x_offset + size]
+            image[:, y_offset : y_offset + size[0], x_offset : x_offset + size[1]]
             for image in images
         ]
-        assert cropped[0].shape[1] == size, "Image not cropped properly"
-        assert cropped[0].shape[2] == size, "Image not cropped properly"
+        assert cropped[0].shape[1] == size[0], "Image not cropped properly"
+        assert cropped[0].shape[2] == size[1], "Image not cropped properly"
+
+        if image is not None:
+            im_h = image.shape[1]
+            im_w = image.shape[2]
+
+            w_ratio = im_w/width
+            h_ratio = im_h/height
+            im_y_offset = round(y_offset*h_ratio)
+            y_size = round(size[0]*h_ratio)
+            im_x_offset = round(x_offset*w_ratio)
+            x_size = round(size[1]*w_ratio)
+
+            crop_image = image[:,
+                               im_y_offset : im_y_offset + y_size,
+                               im_x_offset : im_x_offset + x_size]
+
+            assert abs(crop_image.shape[1]/cropped[0].shape[1] - h_ratio)<1, f"Big image not cropped right {crop_image.shape[1]} {cropped[0].shape[1]} {crop_image.shape[1]/cropped[0].shape[1]} {h_ratio}"
+            assert abs(crop_image.shape[2]/cropped[0].shape[2] - w_ratio)<1, f"Big image not cropped right {crop_image.shape[2]} {cropped[0].shape[2]} {crop_image.shape[2]/cropped[0].shape[2]} {w_ratio}"
+
     elif order == "HWC":
-        if images[0].shape[0] == size and images[0].shape[1] == size:
+        if images[0].shape[0] == size[0] and images[0].shape[1] == size[1]:
             return images, boxes
         height = images[0].shape[0]
         width = images[0].shape[1]
         y_offset = 0
-        if height > size:
-            y_offset = int(np.random.randint(0, height - size))
+        if height > size[0]:
+            y_offset = int(np.random.randint(0, height - size[0]))
         x_offset = 0
-        if width > size:
-            x_offset = int(np.random.randint(0, width - size))
+        if width > size[1]:
+            x_offset = int(np.random.randint(0, width - size[1]))
         cropped = [
-            image[y_offset : y_offset + size, x_offset : x_offset + size, :]
+            image[y_offset : y_offset + size[0], x_offset : x_offset + size[1], :]
             for image in images
         ]
-        assert cropped[0].shape[0] == size, "Image not cropped properly"
-        assert cropped[0].shape[1] == size, "Image not cropped properly"
+        assert cropped[0].shape[0] == size[0], "Image not cropped properly"
+        assert cropped[0].shape[1] == size[1], "Image not cropped properly"
+
+        if image is not None:
+            im_h = image.shape[0]
+            im_w = image.shape[1]
+
+            w_ratio = im_w/width
+            h_ratio = im_h/height
+            im_y_offset = round(y_offset*h_ratio)
+            y_size = round(size[0]*h_ratio)
+            im_x_offset = round(x_offset*w_ratio)
+            x_size = round(size[1]*w_ratio)
+
+            crop_image = image[im_y_offset : im_y_offset + y_size,
+                               im_x_offset : im_x_offset + x_size,
+                               :]
+            
+            assert abs(crop_image.shape[0]/cropped[0].shape[0] - h_ratio)<1, f"Big image not cropped right {crop_image.shape[0]} {cropped[0].shape[0]} {crop_image.shape[0]/cropped[0].shape[0]} {h_ratio}"
+            assert abs(crop_image.shape[1]/cropped[0].shape[1] - w_ratio)<1, f"Big image not cropped right {crop_image.shape[1]} {cropped[0].shape[1]} {crop_image.shape[1]/cropped[0].shape[1]} {w_ratio}"
 
     if boxes is not None:
         boxes = [crop_boxes(proposal, x_offset, y_offset) for proposal in boxes]
-    return cropped, boxes
+    
+    if image is None:
+        crop_image = None
+    return cropped, boxes, crop_image
 
 
 def center_crop(size, image):

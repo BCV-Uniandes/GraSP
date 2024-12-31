@@ -34,14 +34,13 @@ Please check these works!
 
 ## GraSP
 
-In this [link](http://157.253.243.19/GraSP), you will find all the files that compose the entire Holistic and Multi-Granular Surgical Scene Understanding of Prostatectomies (GraSP) dataset. These files include the original Radical Prostatectomy videos, our sampled preprocessed and raw frames, and the gathered annotations for all four semantic tasks. The data in the link has the following organization:
+In this [Google Drive link](https://drive.google.com/drive/folders/16uGgYsQ2oohKo1-iSxOFWnFAPlGTtvb9?usp=sharing), you will find all the files that compose the entire Holistic and Multi-Granular Surgical Scene Understanding of Prostatectomies (GraSP) dataset. These files include the original Radical Prostatectomy videos, our sampled preprocessed and raw frames, and the gathered annotations for all four semantic tasks. The data in the link has the following organization:
 
 ```tree
 GraSP:
 |
-|__GraSP_30fps.tar.gz
-|__GraSP_1fps.tar.hz
-|__raw_frames_30fps.tar.gz
+|__GraSP_30fps
+|__GraSP_1fps
 |__raw_frames_1fps.tar.gz
 |__videos.tar.gz
 |__1fps_to_30fps_association.json
@@ -50,48 +49,32 @@ GraSP:
 
 These files contain the following aspects and versions of our dataset: 
 
-1) ```GraSP_30fps.tar.gz``` Is a compressed archive with all the preprocessed frames sampled at 30fps and all annotations for all tasks in our benchmark. **This is the complete dataset used for model training and evaluation.**
-2) ```GraSP_1fps.tar.gz``` Is a compressed archive with a lighter version of the dataset with preprocessed frames sampled at 1fps and the annotations for these frames. 
-3) ```raw_frames_30fps.tar.gz``` Is a compressed archive with all original frames sampled at 30 fps before frame preprocessing.
-4) ```raw_frames_1fps.tar.gz``` Is a compressed archive with original frames sampled at 1 fps before frame preprocessing.
-5) ```videos.tar.gz``` Is a compressed archive with our dataset's original raw Radical Prostatctomy videos.
-6) ```1fps_to_30fps_association.json``` Contains the name association between frames sampled at 1fps and frames sampled at 30fps.
-7) ```README.txt``` Information file with a summary of files' contents.
+1) ```GraSP_30fps``` Is a directory with the compressed archives containing all the preprocessed frames sampled at 30fps and all annotations for all tasks in our benchmark. **This is the complete dataset used for model training and evaluation.**
+2) ```GraSP_1fps``` Is a directory with compressed archives containing a lighter version of the dataset with preprocessed frames sampled at 1fps and the annotations for these frames. 
+3) ```raw_frames_1fps.tar.gz``` Is a compressed archive with original frames sampled at 1 fps before frame preprocessing.
+4) ```videos.tar.gz``` Is a compressed archive containing our dataset's original raw Radical Prostatctomy videos.
+5) ```1fps_to_30fps_association.json``` Contains the frame name association between frames sampled at 1fps and frames sampled at 30fps.
+6) ```README.txt``` Information file with a summary of files' contents.
 
-You can download all files recursively by running the following command in a Linux terminal:
-
-```sh
-$ wget -r http://157.253.243.19/GraSP
-```
-
-However, **we recommend downloading just the files you require** by running:
+We recommend downloading the necessary dataset files' directory and uncompressing all internal files. For instance, the frames of the GraSP_30fps dataset have been stored on multiple compressed archives per surgery to ease storage space limits during download. We will soon include a single code to download the entire dataset programmatically. In the meantime, we recommend downloading the dataset and uncompressing all internal archives using the following command:
 
 ```sh
-$ wget http://157.253.243.19/GraSP/<file_name>
+$ find /path/to/directory -type f -name "*.tar.gz" -execdir sh -c '
+ for file; do
+ echo "Uncompressing $file..."
+ tar -xzf "$file" && rm -f "$file"
+ done
+ ' sh {} +
 ```
 
-For example, you can only download the video files by running:
-
-```sh
-$ wget http://157.253.243.19/GraSP/videos.tar.gz
-```
-
-**Note:** All compressed archives **contain a README file** with further details and instructions on the data's structure and format. 
-
-### Alternative Download Methods
-
-In case you cannot download the files from our servers, you can download the dataset from this [**Google Drive link**](https://drive.google.com/drive/folders/1JsK99Na1WPaAp9jjwR9ZM4nuwR29CJ3i?usp=sharing).
+**Note:** Most directories and compressed archives **contain a README file** with further details and instructions on the data's structure and format. 
 
 ### Main Dataset to Run our Models
 
-The ```GraSP_30fps.tar.gz``` is the only archive **necessary to run our code**. Hence, to download and uncompress this file, run the following command in a Linux terminal:
+The ```GraSP_30fps``` directory is the only **necessary to run our code**.
 
-```sh
-$ wget http://157.253.243.19/GraSP/GraSP_30fps.tar.gz
-$ tar -xzvf GraSP_30fps.tar.gz
-```
 
-After decompressing the archive, the GraSP_30fps directory must have the following structure:
+After downloading and uncompressing all files, the GraSP_30fps directory must have the following structure:
 
 ```tree
 GraSP_30fps
@@ -135,14 +118,13 @@ GraSP_30fps
      |__README.txt
 ```
 
-
 ## [TAPIS](./TAPIS/)
 
 Go to the [TAPIS directory](./TAPIS/) to find our source codes and instructions for running our TAPIS model.
 
 ## Contact
 
-If you have any doubts, questions, issues, corrections, or comments, please email n.ayobi@uniandes.edu.co.
+If you have any doubts, questions, issues or comments, please email n.ayobi@uniandes.edu.co.
 
 ## Citing GraSP
 

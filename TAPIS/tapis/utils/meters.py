@@ -18,13 +18,16 @@ from sklearn.metrics import average_precision_score
 import tapis.evaluate.main_eval as grasp_eval
 import tapis.utils.logging as logging
 import tapis.utils.misc as misc
+from tapis.evaluate.utils import mask_to_rle
 
 logger = logging.get_logger(__name__)
 
-IDENT_FUNCT_DICT = {'psi_ava': lambda x,y: 'CASE{:03d}/{:05d}.jpg'.format(x,y),
-                    'grasp': lambda x,y: 'CASE{:03d}/{:09d}.jpg'.format(x,y),
-                    'endovis_2018': lambda x,y: 'seq_{}_frame{:03d}.jpg'.format(x,y),
-                    'endovis_2017': lambda x,y: 'seq{}_frame{:03d}.jpg'.format(x,y),}
+# IDENT_FUNCT_DICT = {'psi_ava': lambda x,y: 'CASE{:03d}/{:05d}.jpg'.format(x,y),
+#                     'grasp': lambda x,y: 'CASE{:03d}/{:09d}.jpg'.format(x,y),
+#                     'endovis_2018': lambda x,y: 'seq_{}_frame{:03d}.jpg'.format(x,y),
+#                     'endovis_2017': lambda x,y: 'seq{}_frame{:03d}.jpg'.format(x,y),}
+
+from tapis.datasets import DATASET_REGISTRY
 
 class SurgeryMeter(object):
     """
@@ -40,13 +43,15 @@ class SurgeryMeter(object):
         self.cfg = cfg
         self.dataset_name = cfg.TEST.DATASET
         self.parallel = cfg.NUM_GPUS > 1
+        # if self.parallel:
+        self.join_funct = DATASET_REGISTRY.get(self.dataset_name.capitalize())(cfg,'test',False).frame_num_joining
         self.eval_train = cfg.TRAIN.EVAL_TRAIN
         self.regions = cfg.REGIONS.ENABLE
 
         self.tasks = deepcopy(cfg.TASKS.TASKS)
         self.log_tasks = deepcopy(cfg.TASKS.TASKS)
         self.metrics = deepcopy(cfg.TASKS.METRICS)
-
+        
         if cfg.REGIONS.ENABLE:
             self._region_tasks = {task for task in cfg.TASKS.TASKS if task in cfg.ENDOVIS_DATASET.REGION_TASKS}
             if cfg.TASKS.PRESENCE_RECOGNITION:
@@ -55,6 +60,8 @@ class SurgeryMeter(object):
                 if cfg.TASKS.EVAL_PRESENCE:
                     self.tasks += pres_tasks
                     self.metrics += ["mAP"]*len(pres_tasks)
+        
+        self.generate_masks = not cfg.FEATURES.PRECALCULATE_TEST
 
         self.all_classes = cfg.TASKS.NUM_CLASSES
         self.lr = None
@@ -70,8 +77,13 @@ class SurgeryMeter(object):
         self.overall_iters = overall_iters
         self.groundtruth = cfg.ENDOVIS_DATASET.TEST_COCO_ANNS
         self.segmentation = cfg.REGIONS.ENABLE and cfg.REGIONS.LEVEL=='segmentation'
-
-        if self.segmentation:
+        
+        if self.segmentation and os.path.isdir(cfg.ENDOVIS_DATASET.MASKS_PATH):
+            self.mask_path = cfg.ENDOVIS_DATASET.MASKS_PATH
+        else:
+            self.mask_path = None
+            
+        if self.segmentation and not self.generate_masks:
             with open(os.path.join(cfg.ENDOVIS_DATASET.ANNOTATION_DIR,cfg.ENDOVIS_DATASET.TEST_PREDICT_BOX_JSON)) as f:
                 self.region_proposals = json.load(f)['annotations']
             final_proposals = {}
@@ -85,6 +97,10 @@ class SurgeryMeter(object):
 
                 final_proposals[frame][tuple(bbox)] = rp['segmentation']
             self.region_proposals = final_proposals
+
+        elif self.generate_masks:
+            self.all_masks = []
+
         self.output_dir = cfg.OUTPUT_DIR
 
     def log_iter_stats(self, cur_epoch, cur_iter):
@@ -171,6 +187,9 @@ class SurgeryMeter(object):
         self.all_names = []
         self.all_boxes = []
 
+        if self.generate_masks:
+            self.all_masks = []
+
     def update_stats(self, preds, names, boxes, final_loss= None, losses=None, lr=None):
         """
         Update the current stats.
@@ -189,11 +208,20 @@ class SurgeryMeter(object):
                 self.all_preds[task].extend(preds[task])
             
             if self.parallel:
-                names = [IDENT_FUNCT_DICT[self.dataset_name](*name) for name in names]
+                try:
+                    names = [self.join_funct(name[0],name[1]) for name in names] #[IDENT_FUNCT_DICT[self.dataset_name](*name) for name in names]
+                except:
+                    print(names)
+                    raise
             self.all_names.extend(names)
             if self.regions:
                 self.all_boxes.extend(boxes)
                 assert all(len(names)==len(boxes)==len(preds[t]) for t in self.tasks)
+                if 'masks' in preds:
+                    for masks in preds['masks']:
+                        self.all_masks.append([mask_to_rle(mask.astype('uint8')) for mask in masks])
+                    
+                    assert all(len(names)==len(boxes)==len(preds['masks'])==len(preds[t]) for t in self.tasks)
             else:
                 assert all(len(names)==len(preds[t]) for t in self.tasks)
 
@@ -210,10 +238,10 @@ class SurgeryMeter(object):
         """
         out_name = {}
         for task,metric in zip(self.tasks, self.metrics):
-            out_name[task] = self.save_json(task, self.all_preds, self.all_boxes,  self.all_names, epoch)
-            self.full_map[task] = grasp_eval.main_per_task(self.groundtruth, out_name[task], task, metric)
+            out_name[task] = self.save_json(task, epoch)
+            self.full_map[task] = grasp_eval.main_per_task(self.groundtruth, out_name[task], task, metric, masks_path=self.mask_path)
             if log:
-                stats = {"mode": self.mode, "task":task, "metric": self.full_map[task]}
+                stats = {"mode": self.mode, "task": task, "metric": self.full_map[task]}
                 logging.log_json_stats(stats)
         if log:
             stats = {"mode": self.mode, "mean metric": np.mean([v[m] for v,m in zip(list(self.full_map.values()), self.metrics)])}
@@ -243,15 +271,21 @@ class SurgeryMeter(object):
             
             return metrics_val, mean_map, out_files
 
-    def save_json(self, task, preds, boxes, names, epoch):
+    def save_json(self, task, epoch):
         """
         Save json for the specific task.
         Args:
             cur_epoch (int): the number of current epoch.
         """
         save_json_dict = {}
+
+        preds, boxes, names = self.all_preds, self.all_boxes, self.all_names
+
         if self.regions:
             assert len(preds[task])==len(names)==len(boxes), f'Inconsistent lengths {len(preds[task])} {len(names)} {len(boxes)}'
+            if self.generate_masks:
+                masks = self.all_masks
+                assert len(preds[task])==len(names)==len(boxes)==len(masks), f'Inconsistent lengths {len(preds[task])} {len(names)} {len(boxes)} {len(masks)}'
         else:
             assert len(preds[task])==len(names), f'Inconsistent lengths {len(preds[task])} {len(names)}'
         
@@ -259,11 +293,7 @@ class SurgeryMeter(object):
             task_key_name = f'{task}_score_dist'
             if self.regions and task in self._region_tasks:
                 if self.segmentation:
-                    try:
-                        save_json_dict[name] = {'instances': [{"bbox":box, task_key_name:pred[b_id], "segment": self.region_proposals[name][tuple(box)]} for b_id,box in enumerate(boxes[idx]) if box != [0,0,0,0]]}
-                    except:
-                        traceback.print_exc()
-                        breakpoint()
+                    save_json_dict[name] = {'instances': [{"bbox":box, task_key_name:pred[b_id], "segment": self.region_proposals[name][tuple(box)] if not self.generate_masks else masks[idx][b_id]} for b_id,box in enumerate(boxes[idx]) if box != [0,0,0,0]]}
                 else:
                     save_json_dict[name] = {'instances': [{"bbox":box, task_key_name:pred[b_id]} for b_id,box in enumerate(boxes[idx]) if box != [0,0,0,0]]}
             else:

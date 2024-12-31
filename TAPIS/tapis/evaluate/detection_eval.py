@@ -14,7 +14,7 @@ from .ava_evaluation import (
 )
 from .utils import xywhbbox_to_dxdydxdybbox as normalize_bbox
 
-def eval_detection(task, coco_anns, preds, img_ann_dict, mask_path):
+def eval_detection(task, coco_anns, preds, img_ann_dict, **kwargs):
     # Transform data to pascal format
     categories = coco_anns[f'{task}_categories'] if f'{task}_categories' in coco_anns else coco_anns['categories']
     num_classes = len(categories)

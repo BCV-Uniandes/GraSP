@@ -68,7 +68,7 @@ def train_epoch(
 
         # Transfer the data to the current GPU device.
         if cfg.NUM_GPUS:
-            inputs[0] = inputs[0].cuda(non_blocking=True)
+            inputs = [input.cuda(non_blocking=True) for input in inputs]
             if cfg.MODEL.PRECISION == 64:
                 inputs[0] = inputs[0].double()
 
@@ -94,7 +94,9 @@ def train_epoch(
         with torch.cuda.amp.autocast(enabled=cfg.TRAIN.MIXED_PRECISION):
             rpn_ftrs = data["rpn_features"] if cfg.FEATURES.ENABLE else None
             boxes_mask = data["boxes_mask"] if cfg.REGIONS.ENABLE else None
-            preds = model(inputs, rpn_ftrs, boxes_mask)
+            boxes = data["boxes"] if cfg.REGIONS.ENABLE else None
+            images = data["images"] if cfg.FEATURES.USE_RPN else None
+            preds = model(inputs, bboxes=boxes, features=rpn_ftrs, boxes_mask=boxes_mask, images=images)
 
             # Explicitly declare reduction to mean and compute the loss for each task.
             loss = []
@@ -162,7 +164,7 @@ def eval_epoch(val_loader, model, val_meter, cur_epoch, cfg):
     model.eval()
     val_meter.iter_tic()
     complete_tasks = cfg.TASKS.TASKS
-    region_tasks = {task for task in cfg.TASKS.TASKS if task in cfg.ENDOVIS_DATASET.REGION_TASKS}
+    region_tasks = {task for task in cfg.TASKS.TASKS if cfg.REGIONS.ENABLE and task in cfg.ENDOVIS_DATASET.REGION_TASKS}
     if cfg.REGIONS.ENABLE:
         if cfg.TASKS.PRESENCE_RECOGNITION and cfg.TASKS.EVAL_PRESENCE:
             pres_tasks = [f'{task}_presence' for task in cfg.TASKS.PRESENCE_TASKS]
@@ -194,13 +196,14 @@ def eval_epoch(val_loader, model, val_meter, cur_epoch, cfg):
         ori_boxes = data["ori_boxes"] if cfg.REGIONS.ENABLE else None
         boxes_idxs = data["ori_boxes_idxs"] if cfg.REGIONS.ENABLE else None
         boxes = data["boxes"] if cfg.REGIONS.ENABLE else None
+        images = data["images"] if cfg.FEATURES.USE_RPN else None
 
         assert (not (cfg.REGIONS.ENABLE and cfg.FEATURES.ENABLE)) or len(rpn_ftrs)==len(image_names)==len(boxes), f'Inconsistent lenghts {len(rpn_ftrs)} & {len(image_names)} & {len(boxes)}'
 
-        preds = model(inputs, rpn_ftrs, boxes_mask)
-
+        preds = model(inputs, bboxes=boxes, features=rpn_ftrs, boxes_mask=boxes_mask, images=images)
+        # breakpoint()
         if cfg.NUM_GPUS:
-            preds = {task: preds[task].cpu() for task in complete_tasks}
+            preds = {task: preds[task].cpu() for task in preds}
             ori_boxes = ori_boxes.cpu() if cfg.REGIONS.ENABLE else None
             boxes_idxs = boxes_idxs.cpu() if cfg.REGIONS.ENABLE else None
             boxes_mask = boxes_mask.cpu() if cfg.REGIONS.ENABLE else None
@@ -209,11 +212,7 @@ def eval_epoch(val_loader, model, val_meter, cur_epoch, cfg):
                 image_names = image_names.cpu()
                 image_names = torch.cat(du.all_gather_unaligned(image_names),dim=0).tolist()
 
-                for task in preds:
-                    if task not in region_tasks:
-                        preds[task] = torch.cat(du.all_gather_unaligned(preds[task]), dim=0)
-                    else:
-                        preds[task] = torch.cat(du.all_gather_unaligned(preds[task]), dim=0)
+                preds = {task: torch.cat(du.all_gather_unaligned(preds[task]), dim=0) for task in preds}
 
                 if cfg.REGIONS.ENABLE:
                     ori_boxes = torch.cat(du.all_gather_unaligned(ori_boxes), dim=0)
@@ -227,9 +226,13 @@ def eval_epoch(val_loader, model, val_meter, cur_epoch, cfg):
         val_meter.iter_toc()
 
         if cfg.REGIONS.ENABLE:
-            ori_boxes = [ori_boxes[boxes_idxs==idx].tolist() for idx in range(len(boxes_mask))]
             for task in region_tasks:
                 preds[task] = [preds[task][boxes_idxs==idx].tolist() for idx in range(len(boxes_mask))]
+            if 'masks' in preds:
+                ori_boxes = [preds['boxes'][boxes_mask][boxes_idxs==idx].numpy().tolist() for idx in range(len(boxes_mask))]
+                preds['masks'] = [preds['masks'][boxes_mask][boxes_idxs==idx].numpy() for idx in range(len(boxes_mask))]
+            else:
+                ori_boxes = [ori_boxes[boxes_idxs==idx].tolist() for idx in range(len(boxes_mask))]
         for task in complete_tasks:
             if task not in region_tasks:
                 preds[task] = preds[task].tolist()
@@ -288,15 +291,15 @@ def train(cfg):
             for task in cfg.TASKS.TASKS:
                 head = getattr(model, "extra_heads_{}".format(task))
                 misc.log_model_info(head, cfg, use_train_input=False)
-    except:
-        pass
+    except Exception as e:
+        logger.info(f'Error while trying to calculate model parameters and FLOPs:\n{e}')
 
     # Construct the optimizer.
     optimizer = optim.construct_optimizer(model, cfg)
     
     # Create a GradScaler for mixed precision training
     scaler = torch.cuda.amp.GradScaler(enabled=cfg.TRAIN.MIXED_PRECISION)
-            
+
     # Load a checkpoint to resume training if applicable.
     start_epoch = cu.load_train_checkpoint(
         cfg, model, optimizer, scaler if cfg.TRAIN.MIXED_PRECISION else None
@@ -312,8 +315,8 @@ def train(cfg):
 
     # Perform final test
     if cfg.TEST.ENABLE:
-        logger.info("Evaluating epoch: {}".format(start_epoch + 1))
-        map_task, mean_map, out_files = eval_epoch(val_loader, model, val_meter, start_epoch, cfg)
+        logger.info("Evaluating epoch: {}".format(start_epoch))
+        map_task, mean_map, out_files = eval_epoch(val_loader, model, val_meter, start_epoch-1, cfg)
         if not cfg.TRAIN.ENABLE:
             return
     elif cfg.TRAIN.ENABLE:

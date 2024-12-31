@@ -56,7 +56,7 @@ def calc_mvit_feature_geometry(cfg):
                     feat_stride[i][j] = feat_stride[i][j] * x[j + 1]
     return feat_size, feat_stride
 
-def get_3d_sincos_pos_embed(embed_dim, grid_size, t_size, cls_token=False):
+def get_3d_sincos_pos_embed(embed_dim, grid_size_h, grid_size_w, t_size, cls_token=False):
     """
     grid_size: int of the grid height and width
     t_size: int of the temporal size
@@ -68,12 +68,12 @@ def get_3d_sincos_pos_embed(embed_dim, grid_size, t_size, cls_token=False):
     embed_dim_temporal = embed_dim // 4
 
     # spatial
-    grid_h = np.arange(grid_size, dtype=np.float32)
-    grid_w = np.arange(grid_size, dtype=np.float32)
+    grid_h = np.arange(grid_size_h, dtype=np.float32)
+    grid_w = np.arange(grid_size_w, dtype=np.float32)
     grid = np.meshgrid(grid_w, grid_h)  # here w goes first
     grid = np.stack(grid, axis=0)
 
-    grid = grid.reshape([2, 1, grid_size, grid_size])
+    grid = grid.reshape([2, 1, grid_size_h, grid_size_w])
     pos_embed_spatial = get_2d_sincos_pos_embed_from_grid(
         embed_dim_spatial, grid
     )
@@ -87,7 +87,7 @@ def get_3d_sincos_pos_embed(embed_dim, grid_size, t_size, cls_token=False):
     # concate: [T, H, W] order
     pos_embed_temporal = pos_embed_temporal[:, np.newaxis, :]
     pos_embed_temporal = np.repeat(
-        pos_embed_temporal, grid_size**2, axis=1
+        pos_embed_temporal, grid_size_h*grid_size_w, axis=1
     )  # [T, H*W, D // 4]
     pos_embed_spatial = pos_embed_spatial[np.newaxis, :, :]
     pos_embed_spatial = np.repeat(
@@ -104,18 +104,18 @@ def get_3d_sincos_pos_embed(embed_dim, grid_size, t_size, cls_token=False):
     return pos_embed
 
 
-def get_2d_sincos_pos_embed(embed_dim, grid_size, cls_token=False):
+def get_2d_sincos_pos_embed(embed_dim, grid_size_h, grid_size_w, cls_token=False):
     """
     grid_size: int of the grid height and width
     return:
     pos_embed: [grid_size*grid_size, embed_dim] or [1+grid_size*grid_size, embed_dim] (w/ or w/o cls_token)
     """
-    grid_h = np.arange(grid_size, dtype=np.float32)
-    grid_w = np.arange(grid_size, dtype=np.float32)
+    grid_h = np.arange(grid_size_h, dtype=np.float32)
+    grid_w = np.arange(grid_size_w, dtype=np.float32)
     grid = np.meshgrid(grid_w, grid_h)  # here w goes first
     grid = np.stack(grid, axis=0)
 
-    grid = grid.reshape([2, 1, grid_size, grid_size])
+    grid = grid.reshape([2, 1, grid_size_h, grid_size_w])
     pos_embed = get_2d_sincos_pos_embed_from_grid(embed_dim, grid)
     if cls_token:
         pos_embed = np.concatenate(
