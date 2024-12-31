@@ -36,7 +36,7 @@ $ python -m pip install 'git+https://github.com/facebookresearch/detectron2.git'
 
 ## Data Preparation
 
-In this [Google Drive Link](https://drive.google.com/file/d/1qFUwzmT0c14GE73VEK15saI2AHnszxgB/view?usp=sharing), you will find a compressed archive with our preprocessed data files, region proposals, and pre-trained models. We provide a README file with instructions about the data structures and the files in the link. Download this file and uncompress it with the following command.
+In this [Google Drive Link](https://drive.google.com/file/d/17xE1uYcP3_3T5ejhEZBWNk5sFeMBh6Or/view?usp=sharing), you will find a compressed archive with our preprocessed data files, region proposals, and pre-trained models. We provide a README file with instructions about the data structures and the files in the link. Download this file and uncompress it with the following command.
 
 ```sh
 $ tar -xzvf TAPIS.tar.gz
