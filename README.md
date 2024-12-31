@@ -69,10 +69,6 @@ $ find /path/to/directory -type f -name "*.tar.gz" -execdir sh -c '
 
 **Note:** Most directories and compressed archives **contain a README file** with further details and instructions on the data's structure and format. 
 
-### Dataset updates and versions
-
-We updated the dataset annotations for the surgical phase and surgical step recognition tasks (long-term tasks) in December 2024 to correct minor errors and ambiguities. This final release only modified some long-term annotations and includes a better curated benchmark. However, if older versions of surgical phase and step annotations are needed, they remain available for reference in this [Google Drive Link](https://drive.google.com/drive/folders/1Pnpj-0c7OpShTMqnpuFp66FThhUs90y3?usp=sharing).
-
 ### Main Dataset to Run our Models
 
 The ```GraSP_30fps``` directory is the only **necessary to run our code**.
@@ -121,6 +117,10 @@ GraSP_30fps
      |__grasp_short-term_test.json
      |__README.txt
 ```
+
+### Dataset updates and versions
+
+We updated the dataset annotations for the surgical phase and surgical step recognition tasks (long-term tasks) in December 2024 to correct minor errors and ambiguities. This final release only modified some long-term annotations and includes a better curated benchmark. However, if older versions of surgical phase and step annotations are needed, they remain available for reference in this [Google Drive Link](https://drive.google.com/drive/folders/1Pnpj-0c7OpShTMqnpuFp66FThhUs90y3?usp=sharing).
 
 ## [TAPIS](./TAPIS/)
 
