@@ -34,7 +34,7 @@ Please check these works!
 
 ## GraSP
 
-In this [Google Drive link](https://drive.google.com/drive/folders/16uGgYsQ2oohKo1-iSxOFWnFAPlGTtvb9?usp=sharing), you will find all the files that compose the entire Holistic and Multi-Granular Surgical Scene Understanding of Prostatectomies (GraSP) dataset. These files include the original Radical Prostatectomy videos, our sampled preprocessed and raw frames, and the gathered annotations for all four semantic tasks. The data in the link has the following organization:
+In this [Google Drive link](https://drive.google.com/drive/folders/1uoxZQXdMcslkp0lWvd_w4G4XLfhO5Jx1?usp=sharing), you will find all the files that compose the entire Holistic and Multi-Granular Surgical Scene Understanding of Prostatectomies (GraSP) dataset. These files include the original Radical Prostatectomy videos, our sampled preprocessed and raw frames, and the gathered annotations for all four semantic tasks. The data in the link has the following organization:
 
 ```tree
 GraSP:
@@ -120,7 +120,7 @@ GraSP_30fps
 
 ### Dataset updates and versions
 
-We updated the dataset annotations for the surgical phase and surgical step recognition tasks (long-term tasks) in December 2024 to correct minor errors and ambiguities. This final release only modified some long-term annotations and includes a better curated benchmark. However, if older versions of surgical phase and step annotations are needed, they remain available for reference in this [Google Drive Link](https://drive.google.com/drive/folders/1Pnpj-0c7OpShTMqnpuFp66FThhUs90y3?usp=sharing).
+We updated the dataset annotations for the surgical phase and surgical step recognition tasks (long-term tasks) in December 2024 to correct minor errors and ambiguities. This final release only modified some long-term annotations and includes a better curated benchmark. However, if older versions of surgical phase and step annotations are needed, they remain available for reference in this [Google Drive Link](https://drive.google.com/drive/folders/1uoxZQXdMcslkp0lWvd_w4G4XLfhO5Jx1?usp=sharing).
 
 ## [TAPIS](./TAPIS/)
 
